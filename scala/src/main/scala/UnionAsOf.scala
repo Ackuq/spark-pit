@@ -11,6 +11,13 @@ object UnionAsOf {
   private val dfIndexCol = "df_index"
   private val combinedTSCol = "df_combined_ts"
 
+  /** Prefix all the columns in a dataframe.
+    *
+    * @param df               A dataframe
+    * @param prefix           The prefix for the column names
+    * @param partitionColumns The partitions columns, these will be ignored
+    * @return The prefixed version of the dataframe
+    */
   private def prefixDF(
       df: DataFrame,
       prefix: String,
@@ -22,17 +29,26 @@ object UnionAsOf {
     df.select(newColumnsQuery: _*)
   }
 
+  /** Add all the columns and fill them with null
+    *
+    * @param df      The dataframe we want to add the columns to
+    * @param columns A sequence of columns
+    * @return
+    */
   private def addColumns(df: DataFrame, columns: Seq[String]) = {
     columns.foldLeft(df)(_.withColumn(_, lit(null)))
   }
 
-  /** @param left         The left dataframe, will be used as reference
+  /** Perform a backward asof join using the left table for event times.
+    *
+    * @param left          The left dataframe, will be used as reference
     * @param right         The right dataframe, will be used to merge
     * @param leftTSColumn  The column used for timestamps in left DF
     * @param rightTSColumn The column used for timestamps in right DF
     * @param leftPrefix    Optional, the prefix for the left columns in result
     * @param rightPrefix   The prefix for the right columns in result
-    * @return
+    * @param partitionCols The columns used for partitioning, if used
+    * @return The PIT-correct view of the joined dataframes
     */
   def join(
       left: DataFrame,
@@ -109,14 +125,17 @@ object UnionAsOf {
         partitionCols.map(col): _*
       )
       // TODO: Could we bound the start value?
-      .rowsBetween(Window.unboundedPreceding, 0L)
+      .rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
+    // To perform the join, a window is slides through all the rows and merges each row with the last right values
+    // TODO: Could we be able to not slide through all of the rows?
     val asOfDF =
-      rightPrefixedAllColumns.columns
+      rightPrefixed.columns
         .foldLeft(orderedCombined)((df, col) =>
           df.withColumn(col, last(df(col), ignoreNulls = true).over(windowSpec))
         )
-        .filter(col(leftTS).isNotNull && col(leftTS) >= col(rightTS))
+        // Invalid candidates are those where the left values are not existing
+        .filter(col(leftTS).isNotNull)
         .drop(dfIndexCol)
         .drop(combinedTSCol)
 

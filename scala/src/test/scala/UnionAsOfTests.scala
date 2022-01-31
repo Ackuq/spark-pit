@@ -14,7 +14,6 @@ class UnionAsOfTests extends AnyFlatSpec with SparkSessionTestWrapper {
         rightPrefix = "fg2_",
         partitionCols = Seq("id")
       )
-
     assert(!pitJoin.isEmpty)
     // Assert same schema
     assert(pitJoin.schema.equals(smallData.PIT_1_2.schema))
