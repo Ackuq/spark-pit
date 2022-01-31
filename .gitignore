@@ -1,0 +1,18 @@
+# IDE files
+.idea
+*.iml
+.vscode
+
+# Scala related files
+scala/target
+scala/project/target/
+scala/project/project/target/
+scala/target/stream/*
+.bsp
+
+# ignore build files
+**/build
+**/dist
+
+# Mac files
+.DS_Store
