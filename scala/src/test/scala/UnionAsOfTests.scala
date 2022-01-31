@@ -5,14 +5,11 @@ import utils.SparkSessionTestWrapper
 import org.scalatest.flatspec.AnyFlatSpec
 
 class UnionAsOfTests extends AnyFlatSpec with SparkSessionTestWrapper {
-
   it should "Perform a PIT join with two dataframes, aligned timestamps" in {
-    val left = testData.head
-    val right = testData(1)
     val pitJoin =
       UnionAsOf.join(
-        left,
-        right,
+        smallData.fg1,
+        smallData.fg2,
         leftPrefix = Some("fg1_"),
         rightPrefix = "fg2_",
         partitionCols = Seq("id")
@@ -20,18 +17,16 @@ class UnionAsOfTests extends AnyFlatSpec with SparkSessionTestWrapper {
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
-    assert(pitJoin.schema.equals(testDataPIT2Groups1.schema))
+    assert(pitJoin.schema.equals(smallData.PIT_1_2.schema))
     // Assert same elements
-    assert(pitJoin.collect().sameElements(testDataPIT2Groups1.collect()))
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_2.collect()))
   }
 
   it should "Perform a PIT join with two dataframes, misaligned timestamps" in {
-    val left = testData.head
-    val right = testData(2)
     val pitJoin =
       UnionAsOf.join(
-        left,
-        right,
+        smallData.fg1,
+        smallData.fg3,
         leftPrefix = Some("fg1_"),
         rightPrefix = "fg2_",
         partitionCols = Seq("id")
@@ -39,8 +34,33 @@ class UnionAsOfTests extends AnyFlatSpec with SparkSessionTestWrapper {
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
-    assert(pitJoin.schema.equals(testDataPIT2Groups2.schema))
+    assert(pitJoin.schema.equals(smallData.PIT_1_3.schema))
     // Assert same elements
-    assert(pitJoin.collect().sameElements(testDataPIT2Groups2.collect()))
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_3.collect()))
+  }
+
+  it should "Perform a PIT join with three dataframes, misaligned timestamps" in {
+    val left =
+      UnionAsOf.join(
+        smallData.fg1,
+        smallData.fg2,
+        leftPrefix = Some("fg1_"),
+        rightPrefix = "fg2_",
+        partitionCols = Seq("id")
+      )
+
+    val pitJoin = UnionAsOf.join(
+      left,
+      smallData.fg3,
+      leftTSColumn = "fg1_ts",
+      rightPrefix = "fg3_",
+      partitionCols = Seq("id")
+    )
+
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    assert(pitJoin.schema.equals(smallData.PIT_1_2_3.schema))
+    // Assert same elements
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_2_3.collect()))
   }
 }
