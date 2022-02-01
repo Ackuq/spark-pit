@@ -1360,18 +1360,11 @@ class CustomAstBuilder
         ) {
           throw QueryParsingErrors.invalidLateralJoinRelationError(join.right)
         }
-        // Special handling for our join operator
-        if (!join.joinCriteria.isEmpty && join.joinCriteria.ASOF != null) {
-          return AsOfJoin(
-            left,
-            plan(join.right),
-            PITJoin,
-            Option(expression(join.joinCriteria.booleanExpression))
-          )
-        }
 
         // Resolve the join type and join condition
         val (joinType, condition) = Option(join.joinCriteria) match {
+          case Some(c) if c.ASOF != null =>
+            (PITJoin, Option(expression(c.booleanExpression)))
           case Some(c) if c.USING != null =>
             if (join.LATERAL != null) {
               throw QueryParsingErrors.lateralJoinWithUsingJoinUnsupportedError(
