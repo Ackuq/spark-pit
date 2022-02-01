@@ -439,11 +439,13 @@ joinType
     | RIGHT OUTER?
     | FULL OUTER?
     | LEFT? ANTI
+    | PIT
     ;
 
 joinCriteria
     : ON booleanExpression
     | USING '(' identifier (',' identifier)* ')'
+    | ASOF booleanExpression
     ;
 
 sample
@@ -695,7 +697,7 @@ qualifiedName
 identifier
     : strictIdentifier
     | ANTI | FULL | INNER | LEFT | SEMI | RIGHT | NATURAL | JOIN | CROSS | ON
-    | UNION | INTERSECT | EXCEPT | SETMINUS
+    | UNION | INTERSECT | EXCEPT | SETMINUS | PIT
     ;
 
 strictIdentifier
@@ -867,6 +869,9 @@ IGNORE: 'IGNORE';
 BOTH: 'BOTH';
 LEADING: 'LEADING';
 TRAILING: 'TRAILING';
+
+PIT: 'PIT';
+ASOF: 'ASOF';
 
 IF: 'IF';
 POSITION: 'POSITION';
