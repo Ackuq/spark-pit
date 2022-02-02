@@ -1,10 +1,13 @@
 package io.github.ackuq
 
+import data.SmallDataUnion
 import utils.SparkSessionTestWrapper
 
 import org.scalatest.flatspec.AnyFlatSpec
 
 class UnionAsOfTests extends AnyFlatSpec with SparkSessionTestWrapper {
+  val smallData = new SmallDataUnion(spark)
+
   it should "Perform a PIT join with two dataframes, aligned timestamps" in {
     val pitJoin =
       UnionAsOf.join(

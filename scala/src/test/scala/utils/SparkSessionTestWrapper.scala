@@ -1,8 +1,6 @@
 package io.github.ackuq
 package utils
 
-import data.SmallData
-
 import org.apache.spark.sql.SparkSession
 
 trait SparkSessionTestWrapper {
@@ -12,5 +10,4 @@ trait SparkSessionTestWrapper {
     .appName("Spark PIT Tests")
     .getOrCreate()
 
-  val smallData = new SmallData(spark)
 }

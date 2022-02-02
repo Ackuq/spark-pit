@@ -1,9 +1,11 @@
 package io.github.ackuq
 
+import execution.CustomStrategy
+
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{SparkSession, Strategy}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.parser.CustomCatalystSqlParser
-import io.github.ackuq.execution.CustomStrategy
+
 object EarlyStopSortMerge {
 
   def init(conf: SparkConf): SparkSession = {
@@ -16,7 +18,7 @@ object EarlyStopSortMerge {
       .getOrCreate()
 
     spark.experimental.extraStrategies = Seq(CustomStrategy)
-    
+
     spark
   }
 }
