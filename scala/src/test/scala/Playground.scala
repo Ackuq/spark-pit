@@ -18,10 +18,10 @@ object Playground {
     val smallData = new SmallData(spark)
 
     val fg1 = smallData.fg1
-    val fg2 = smallData.fg2
+    val fg2 = smallData.fg3
 
     val joinedData = fg1
-      .join(fg2, fg1("id") === fg2("id") && fg1("ts") >= fg2("ts"), "pit")
+      .join(fg2, fg1("ts") >= fg2("ts") && fg1("id") === fg2("id"), "pit")
 
     //    fg1.createOrReplaceTempView("fg1")
     //    fg2.createOrReplaceTempView("fg2")
@@ -31,7 +31,7 @@ object Playground {
     //    val joinedData =
     //      spark.sql(query)
 
-    println(joinedData.queryExecution.sparkPlan)
+    // println(joinedData.queryExecution.sparkPlan)
 
     joinedData.show()
   }
