@@ -15,18 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.joins
+package io.github.ackuq
+package execution
+
+import logical.{CustomJoinType, PITJoinType}
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen._
-import org.apache.spark.sql.catalyst.plans._
+import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.physical.{
   Partitioning,
   PartitioningCollection
 }
 import org.apache.spark.sql.execution._
+import org.apache.spark.sql.execution.joins.ShuffledJoin
 import org.apache.spark.sql.execution.metric.SQLMetrics
 
 /** Performs a PIT join of two child relations.
@@ -36,12 +40,17 @@ case class PITJoinExec(
     rightPitKeys: Seq[Expression],
     leftEquiKeys: Seq[Expression],
     rightEquiKeys: Seq[Expression],
-    joinType: JoinType,
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
     isSkewJoin: Boolean = false
 ) extends ShuffledJoin {
+
+  // Set as inner
+  override def joinType: JoinType = Inner
+
+  val customJoinType: CustomJoinType = PITJoinType
+
   override def leftKeys: Seq[Expression] = leftEquiKeys ++ leftPitKeys
 
   override def rightKeys: Seq[Expression] = rightEquiKeys ++ rightPitKeys
@@ -53,8 +62,8 @@ case class PITJoinExec(
     )
   )
 
-  override def outputPartitioning: Partitioning = joinType match {
-    case PITJoin =>
+  override def outputPartitioning: Partitioning = customJoinType match {
+    case PITJoinType =>
       PartitioningCollection(
         Seq(left.outputPartitioning, right.outputPartitioning)
       )
@@ -65,8 +74,8 @@ case class PITJoinExec(
   }
 
   override def output: Seq[Attribute] = {
-    joinType match {
-      case PITJoin =>
+    customJoinType match {
+      case PITJoinType =>
         left.output ++ right.output
       case x =>
         throw new IllegalArgumentException(
@@ -75,9 +84,9 @@ case class PITJoinExec(
     }
   }
 
-  override def outputOrdering: Seq[SortOrder] = joinType match {
+  override def outputOrdering: Seq[SortOrder] = customJoinType match {
     // For PIT join, the order should be in descending time order
-    case PITJoin => getKeyOrdering(leftKeys, left.outputOrdering)
+    case PITJoinType => getKeyOrdering(leftKeys, left.outputOrdering)
     case x =>
       throw new IllegalArgumentException(
         s"${getClass.getSimpleName} should not take $x as the JoinType"
@@ -130,8 +139,9 @@ case class PITJoinExec(
   /** These generator are for generating the PIT keys
     */
 
-  private def createLeftPITKeyGenerator(): Projection =
+  private def createLeftPITKeyGenerator(): Projection = {
     UnsafeProjection.create(leftPitKeys, left.output)
+  }
 
   private def createRightPITKeyGenerator(): Projection =
     UnsafeProjection.create(rightPitKeys, right.output)
@@ -140,7 +150,7 @@ case class PITJoinExec(
     val numOutputRows = longMetric("numOutputRows")
 
     left.execute().zipPartitions(right.execute()) { (leftIter, rightIter) =>
-      val boundCondition: (InternalRow) => Boolean = {
+      val boundCondition: InternalRow => Boolean = {
         condition
           .map { cond =>
             Predicate.create(cond, left.output ++ right.output).eval _
@@ -172,8 +182,8 @@ case class PITJoinExec(
       val resultProj: InternalRow => InternalRow =
         UnsafeProjection.create(output, output)
 
-      joinType match {
-        case PITJoin =>
+      customJoinType match {
+        case PITJoinType =>
           new RowIterator {
             private[this] var currentLeftRow: InternalRow = _
             private[this] var currentRightMatch: UnsafeRow = _
@@ -223,8 +233,8 @@ case class PITJoinExec(
   private lazy val (
     (streamedPlan, streamedEquiKeys, streamedPITKeys),
     (bufferedPlan, bufferedEquiKeys, bufferedPITKeys)
-  ) = joinType match {
-    case PITJoin =>
+  ) = customJoinType match {
+    case PITJoinType =>
       ((left, leftEquiKeys, leftPitKeys), (right, rightEquiKeys, rightPitKeys))
     case x =>
       throw new IllegalArgumentException(
@@ -248,29 +258,31 @@ case class PITJoinExec(
   ): PITJoinExec =
     copy(left = newLeft, right = newRight)
 
+  // TODO: Add codegen support
   override protected def doProduce(ctx: CodegenContext): String = ???
 }
 
 /** Helper class that is used to implement [[PITJoinExec]].
   *
   * To perform an inner (outer) join, users of this class call [[findNextInnerJoinRows()]]
-  * ([[findNextOuterJoinRows()]]), which returns `true` if a result has been produced and `false`
+  * which returns `true` if a result has been produced and `false`
   * otherwise. If a result has been produced, then the caller may call [[getStreamedRow]] to return
-  * the matching row from the streamed input and may call [[getBufferedMatches]] to return the
-  * sequence of matching rows from the buffered input (in the case of an outer join, this will return
-  * an empty sequence if there are no matches from the buffered input). For efficiency, both of these
+  * the matching row from the streamed input  For efficiency, both of these
   * methods return mutable objects which are re-used across calls to the `findNext*JoinRows()`
   * methods.
   *
-  * @param streamedKeyGenerator  a projection that produces join keys from the streamed input.
-  * @param bufferedKeyGenerator  a projection that produces join keys from the buffered input.
-  * @param keyOrdering           an ordering which can be used to compare join keys.
-  * @param streamedIter          an input whose rows will be streamed.
-  * @param bufferedIter          an input whose rows will be buffered to construct sequences of rows that
-  *                              have the same join key.
-  * @param eagerCleanupResources the eager cleanup function to be invoked when no join row found
+  * @param streamedPITKeyGenerator a projection that produces PIT join keys from the streamed input.
+  * @param bufferedPITKeyGenerator a projection that produces PIT join keys from the buffered input.
+  * @param pitKeyOrdering             an ordering which can be used to compare PIT join keys.
+  * @param streamedEquiKeyGenerator a projection that produces join keys from the streamed input.
+  * @param bufferedEquiKeyGenerator a projection that produces join keys from the buffered input.
+  * @param equiKeyOrdering             an ordering which can be used to compare equi join keys.
+  * @param streamedIter            an input whose rows will be streamed.
+  * @param bufferedIter            an input whose rows will be buffered to construct sequences of rows that
+  *                                have the same join key.
+  * @param eagerCleanupResources   the eager cleanup function to be invoked when no join row found
   */
-private[joins] class PITJoinScanner(
+class PITJoinScanner(
     streamedPITKeyGenerator: Projection,
     bufferedPITKeyGenerator: Projection,
     pitKeyOrdering: Ordering[InternalRow],
@@ -295,7 +307,7 @@ private[joins] class PITJoinScanner(
   private[this] var matchJoinPITKey: InternalRow = _
 
   /** Contains the current match */
-  private[this] var bufferedMatch: UnsafeRow = null
+  private[this] var bufferedMatch: UnsafeRow = _
 
   // Initialization (note: do _not_ want to advance streamed here).
   advancedBuffered()
@@ -310,8 +322,7 @@ private[joins] class PITJoinScanner(
     * join rows found, try to do the eager resources cleanup.
     *
     * @return true if matching rows have been found and false otherwise. If this returns true, then
-    *         [[getStreamedRow]] and [[getBufferedMatches]] can be called to construct the join
-    *         results.
+    *         [[getStreamedRow]]  can be called to construct the joinresults.
     */
   final def findNextInnerJoinRows(): Boolean = {
     while (

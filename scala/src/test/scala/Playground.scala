@@ -1,18 +1,20 @@
 package io.github.ackuq
 
-import utils.SparkSessionTestWrapper
+import EarlyStopSortMerge.pit
+import data.SmallData
 
-import io.github.ackuq.data.SmallData
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, desc, rank}
+import org.apache.spark.sql.SparkSession
 
 object Playground {
-  def main(args: Array[String]) = {
-    val conf: SparkConf = new SparkConf()
-    conf.setMaster("local")
-    conf.setAppName("Spark PIT Tests")
-    val spark = EarlyStopSortMerge.init(conf)
+  def main(args: Array[String]): Unit = {
+    val spark: SparkSession = SparkSession
+      .builder()
+      .master("local")
+      .appName("Spark PIT Tests")
+      .getOrCreate()
+
+    EarlyStopSortMerge.init(spark)
     spark.sparkContext.setLogLevel("WARN")
 
     val smallData = new SmallData(spark)
@@ -20,20 +22,26 @@ object Playground {
     val fg1 = smallData.fg1
     val fg2 = smallData.fg3
 
-    val joinedData = fg1
-      .join(fg2, fg1("ts") >= fg2("ts") && fg1("id") === fg2("id"), "pit")
+//    val joinedData = fg1
+//      .join(
+//        fg2,
+//        pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id")
+//      )
+//
+//    joinedData.show()
+//    joinedData.explain()
 
-    //    fg1.createOrReplaceTempView("fg1")
-    //    fg2.createOrReplaceTempView("fg2")
-    //
-    //    val query = "SELECT * FROM fg1 PIT JOIN fg2 ASOF fg1.ts >= fg2.ts"
-    //
-    //    val joinedData =
-    //      spark.sql(query)
+    fg1.createOrReplaceTempView("fg1")
+    fg2.createOrReplaceTempView("fg2")
 
-    // println(joinedData.queryExecution.sparkPlan)
+    val query =
+      "SELECT * FROM fg1 JOIN fg2 ON PIT(fg1.ts, fg2.ts) AND fg1.id = fg2.id"
 
-    joinedData.show()
+    val joinedDataSQL =
+      spark.sql(query)
+
+    println(joinedDataSQL.queryExecution.sparkPlan)
+    joinedDataSQL.explain()
   }
 
 }

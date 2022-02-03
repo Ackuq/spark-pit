@@ -1,24 +1,23 @@
 package io.github.ackuq
 
 import execution.CustomStrategy
+import logical.PITRule
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.parser.CustomCatalystSqlParser
+import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.functions.udf
+import org.apache.spark.sql.{Column, SparkSession}
 
 object EarlyStopSortMerge {
 
-  def init(conf: SparkConf): SparkSession = {
-    val spark = SparkSession
-      .builder()
-      .config(conf)
-      .withExtensions(extensions =>
-        extensions.injectParser((_, _) => CustomCatalystSqlParser)
-      )
-      .getOrCreate()
+  val PIT_UDF_NAME = "PIT"
 
+  private val pitFunction = (_: Column, _: Column) => true
+
+  val pit: UserDefinedFunction = udf(pitFunction).withName(PIT_UDF_NAME)
+
+  def init(spark: SparkSession): Unit = {
+    spark.udf.register(PIT_UDF_NAME, pit)
     spark.experimental.extraStrategies = Seq(CustomStrategy)
-
-    spark
+    spark.experimental.extraOptimizations = Seq(PITRule)
   }
 }

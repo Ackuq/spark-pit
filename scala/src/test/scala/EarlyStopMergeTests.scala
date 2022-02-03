@@ -1,16 +1,13 @@
 package io.github.ackuq
 
+import EarlyStopSortMerge.pit
 import data.SmallDataSortMerge
+import utils.SparkSessionTestWrapper
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 
-class EarlyStopMergeTests extends AnyFlatSpec {
-  val conf: SparkConf = new SparkConf()
-  conf.setMaster("local")
-  conf.setAppName("Spark PIT Tests")
-  val spark: SparkSession = EarlyStopSortMerge.init(conf)
+class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
+  EarlyStopSortMerge.init(spark)
   val smallData = new SmallDataSortMerge(spark)
 
   it should "Perform a PIT join with two dataframes, aligned timestamps" in {
@@ -18,7 +15,7 @@ class EarlyStopMergeTests extends AnyFlatSpec {
     val fg2 = smallData.fg2
 
     val pitJoin =
-      fg1.join(fg2, fg1("id") === fg2("id") && fg1("ts") >= fg2("ts"), "pit")
+      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
@@ -32,7 +29,7 @@ class EarlyStopMergeTests extends AnyFlatSpec {
     val fg2 = smallData.fg3
 
     val pitJoin =
-      fg1.join(fg2, fg1("id") === fg2("id") && fg1("ts") >= fg2("ts"), "pit")
+      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
@@ -47,10 +44,13 @@ class EarlyStopMergeTests extends AnyFlatSpec {
     val fg3 = smallData.fg3
 
     val left =
-      fg1.join(fg2, fg1("id") === fg2("id") && fg1("ts") >= fg2("ts"), "pit")
+      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
 
     val pitJoin =
-      left.join(fg3, fg1("id") === fg3("id") && fg1("ts") >= fg3("ts"), "pit")
+      left.join(
+        fg3,
+        pit(fg1("ts"), fg3("ts")) && fg1("id") === fg3("id")
+      )
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
