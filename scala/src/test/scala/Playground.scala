@@ -1,9 +1,7 @@
 package io.github.ackuq
 
-import EarlyStopSortMerge.pit
 import data.SmallData
 
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 object Playground {

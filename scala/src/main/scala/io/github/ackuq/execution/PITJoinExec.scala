@@ -24,11 +24,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen._
-import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.physical.{
   Partitioning,
   PartitioningCollection
 }
+import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.joins.ShuffledJoin
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -46,21 +46,29 @@ case class PITJoinExec(
     isSkewJoin: Boolean = false
 ) extends ShuffledJoin {
 
-  // Set as inner
-  override def joinType: JoinType = Inner
-
-  val customJoinType: CustomJoinType = PITJoinType
-
-  override def leftKeys: Seq[Expression] = leftEquiKeys ++ leftPitKeys
-
-  override def rightKeys: Seq[Expression] = rightEquiKeys ++ rightPitKeys
-
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
       sparkContext,
       "number of output rows"
     )
   )
+  private lazy val (
+    (streamedPlan, streamedEquiKeys, streamedPITKeys),
+    (bufferedPlan, bufferedEquiKeys, bufferedPITKeys)
+  ) = customJoinType match {
+    case PITJoinType =>
+      ((left, leftEquiKeys, leftPitKeys), (right, rightEquiKeys, rightPitKeys))
+    case x =>
+      throw new IllegalArgumentException(
+        s"PITJoin.streamedPlan/bufferedPlan should not take $x as the JoinType"
+      )
+  }
+  private lazy val streamedOutput = streamedPlan.output
+  private lazy val bufferedOutput = bufferedPlan.output
+  val customJoinType: CustomJoinType = PITJoinType
+
+  // Set as inner
+  override def joinType: JoinType = Inner
 
   override def outputPartitioning: Partitioning = customJoinType match {
     case PITJoinType =>
@@ -73,17 +81,6 @@ case class PITJoinExec(
       )
   }
 
-  override def output: Seq[Attribute] = {
-    customJoinType match {
-      case PITJoinType =>
-        left.output ++ right.output
-      case x =>
-        throw new IllegalArgumentException(
-          s"${getClass.getSimpleName} not take $x as the JoinType"
-        )
-    }
-  }
-
   override def outputOrdering: Seq[SortOrder] = customJoinType match {
     // For PIT join, the order should be in descending time order
     case PITJoinType => getKeyOrdering(leftKeys, left.outputOrdering)
@@ -92,6 +89,8 @@ case class PITJoinExec(
         s"${getClass.getSimpleName} should not take $x as the JoinType"
       )
   }
+
+  override def leftKeys: Seq[Expression] = leftEquiKeys ++ leftPitKeys
 
   /** The utility method to get output ordering for left or right side of the join.
     *
@@ -117,9 +116,6 @@ case class PITJoinExec(
     }
   }
 
-  override def requiredChildOrdering: Seq[Seq[SortOrder]] =
-    requiredOrders(leftKeys) :: requiredOrders(rightKeys) :: Nil
-
   private def requiredOrders(keys: Seq[Expression]): Seq[SortOrder] = {
     // This must be ascending in order to agree with the `keyOrdering` defined in `doExecute()`.
 
@@ -127,24 +123,17 @@ case class PITJoinExec(
     keys.map(SortOrder(_, Descending))
   }
 
-  /** These generator are for generating for the equi-keys
-    */
+  override def requiredChildOrdering: Seq[Seq[SortOrder]] =
+    requiredOrders(leftKeys) :: requiredOrders(rightKeys) :: Nil
 
-  private def createLeftEquiKeyGenerator(): Projection =
-    UnsafeProjection.create(leftEquiKeys, left.output)
+  override def rightKeys: Seq[Expression] = rightEquiKeys ++ rightPitKeys
 
-  private def createRightEquiKeyGenerator(): Projection =
-    UnsafeProjection.create(rightEquiKeys, right.output)
+  // Keep codegen support of for the moment
+  override def supportCodegen: Boolean = false
 
-  /** These generator are for generating the PIT keys
-    */
-
-  private def createLeftPITKeyGenerator(): Projection = {
-    UnsafeProjection.create(leftPitKeys, left.output)
+  override def inputRDDs(): Seq[RDD[InternalRow]] = {
+    streamedPlan.execute() :: bufferedPlan.execute() :: Nil
   }
-
-  private def createRightPITKeyGenerator(): Projection =
-    UnsafeProjection.create(rightPitKeys, right.output)
 
   protected override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
@@ -230,27 +219,35 @@ case class PITJoinExec(
     }
   }
 
-  private lazy val (
-    (streamedPlan, streamedEquiKeys, streamedPITKeys),
-    (bufferedPlan, bufferedEquiKeys, bufferedPITKeys)
-  ) = customJoinType match {
-    case PITJoinType =>
-      ((left, leftEquiKeys, leftPitKeys), (right, rightEquiKeys, rightPitKeys))
-    case x =>
-      throw new IllegalArgumentException(
-        s"PITJoin.streamedPlan/bufferedPlan should not take $x as the JoinType"
-      )
+  override def output: Seq[Attribute] = {
+    customJoinType match {
+      case PITJoinType =>
+        left.output ++ right.output
+      case x =>
+        throw new IllegalArgumentException(
+          s"${getClass.getSimpleName} not take $x as the JoinType"
+        )
+    }
   }
 
-  private lazy val streamedOutput = streamedPlan.output
-  private lazy val bufferedOutput = bufferedPlan.output
+  /** These generator are for generating for the equi-keys
+    */
 
-  // Keep codegen support of for the moment
-  override def supportCodegen: Boolean = false
+  private def createLeftEquiKeyGenerator(): Projection =
+    UnsafeProjection.create(leftEquiKeys, left.output)
 
-  override def inputRDDs(): Seq[RDD[InternalRow]] = {
-    streamedPlan.execute() :: bufferedPlan.execute() :: Nil
+  private def createRightEquiKeyGenerator(): Projection =
+    UnsafeProjection.create(rightEquiKeys, right.output)
+
+  /** These generator are for generating the PIT keys
+    */
+
+  private def createLeftPITKeyGenerator(): Projection = {
+    UnsafeProjection.create(leftPitKeys, left.output)
   }
+
+  private def createRightPITKeyGenerator(): Projection =
+    UnsafeProjection.create(rightPitKeys, right.output)
 
   override protected def withNewChildrenInternal(
       newLeft: SparkPlan,

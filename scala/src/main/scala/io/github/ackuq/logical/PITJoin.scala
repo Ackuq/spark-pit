@@ -27,6 +27,20 @@ case class PITJoin(
 ) extends BinaryNode
     with PredicateHelper {
 
+  // Joins are only resolved if they don't introduce ambiguous expression ids.
+  override lazy val resolved: Boolean = {
+    childrenResolved &&
+    expressions.forall(_.resolved) &&
+    duplicateResolved &&
+    condition.forall(_.dataType == BooleanType)
+  }
+  override protected lazy val validConstraints: ExpressionSet = {
+    left.constraints
+  }
+  override val nodePatterns: Seq[TreePattern] = {
+    Seq(JOIN)
+  }
+
   override def maxRows: Option[Long] = {
     left.maxRows
   }
@@ -39,23 +53,8 @@ case class PITJoin(
     children.flatMap(_.metadataOutput)
   }
 
-  override protected lazy val validConstraints: ExpressionSet = {
-    left.constraints
-  }
-
   def duplicateResolved: Boolean =
     left.outputSet.intersect(right.outputSet).isEmpty
-
-  // Joins are only resolved if they don't introduce ambiguous expression ids.
-  override lazy val resolved: Boolean = {
-    childrenResolved &&
-    expressions.forall(_.resolved) &&
-    duplicateResolved &&
-    condition.forall(_.dataType == BooleanType)
-  }
-  override val nodePatterns: Seq[TreePattern] = {
-    Seq(JOIN)
-  }
 
   override protected def withNewChildrenInternal(
       newLeft: LogicalPlan,

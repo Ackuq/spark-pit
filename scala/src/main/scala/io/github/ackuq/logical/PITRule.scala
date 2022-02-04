@@ -14,15 +14,6 @@ import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 
 object PITRule extends Rule[LogicalPlan] with PredicateHelper {
-  private def getPITExpression(predicates: Seq[Expression]) = {
-    predicates.flatMap {
-      // TODO: Identifying by name is unsafe, maybe could be improved
-      case f: ScalaUDF if f.udfName.getOrElse("") == PIT_UDF_NAME =>
-        Some(f)
-      case _ => None
-    }
-  }
-
   def apply(logicalPlan: LogicalPlan): LogicalPlan =
     logicalPlan.transform { case j @ Join(left, right, _, condition, _) =>
       val predicates = {
@@ -47,4 +38,13 @@ object PITRule extends Rule[LogicalPlan] with PredicateHelper {
         j
       }
     }
+
+  private def getPITExpression(predicates: Seq[Expression]) = {
+    predicates.flatMap {
+      // TODO: Identifying by name is unsafe, maybe could be improved
+      case f: ScalaUDF if f.udfName.getOrElse("") == PIT_UDF_NAME =>
+        Some(f)
+      case _ => None
+    }
+  }
 }

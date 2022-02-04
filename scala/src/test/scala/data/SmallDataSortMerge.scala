@@ -10,6 +10,7 @@ import org.apache.spark.sql.types.{
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
+
   private val PIT_1_2_RAW = Seq(
     Row(2, 8, "2y", 2, 8, "2y"),
     Row(2, 6, "2x", 2, 6, "2x"),
@@ -17,7 +18,6 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     Row(1, 5, "1x", 1, 5, "1x"),
     Row(1, 4, "1z", 1, 4, "1z")
   )
-
   private val PIT_1_3_RAW = Seq(
     Row(2, 8, "2y", 2, 8, "f3-2-8"),
     Row(2, 6, "2x", 2, 2, "f3-2-2"),
@@ -25,7 +25,6 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     Row(1, 5, "1x", 1, 1, "f3-1-1"),
     Row(1, 4, "1z", 1, 1, "f3-1-1")
   )
-
   private val PIT_1_2_3_RAW = Seq(
     Row(2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"),
     Row(2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"),
@@ -33,7 +32,6 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     Row(1, 5, "1x", 1, 5, "1x", 1, 1, "f3-1-1"),
     Row(1, 4, "1z", 1, 4, "1z", 1, 1, "f3-1-1")
   )
-
   private val PIT_2_schema: StructType = StructType(
     Seq(
       StructField("id", IntegerType, nullable = false),
@@ -44,17 +42,6 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
       StructField("value", StringType, nullable = false)
     )
   )
-
-  val PIT_1_2: DataFrame = spark.createDataFrame(
-    spark.sparkContext.parallelize(PIT_1_2_RAW),
-    PIT_2_schema
-  )
-
-  val PIT_1_3: DataFrame = spark.createDataFrame(
-    spark.sparkContext.parallelize(PIT_1_3_RAW),
-    PIT_2_schema
-  )
-
   private val PIT_3_schema: StructType = StructType(
     Seq(
       StructField("id", IntegerType, nullable = false),
@@ -68,10 +55,16 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
       StructField("value", StringType, nullable = false)
     )
   )
-
+  val PIT_1_2: DataFrame = spark.createDataFrame(
+    spark.sparkContext.parallelize(PIT_1_2_RAW),
+    PIT_2_schema
+  )
+  val PIT_1_3: DataFrame = spark.createDataFrame(
+    spark.sparkContext.parallelize(PIT_1_3_RAW),
+    PIT_2_schema
+  )
   val PIT_1_2_3: DataFrame = spark.createDataFrame(
     spark.sparkContext.parallelize(PIT_1_2_3_RAW),
     PIT_3_schema
   )
-
 }

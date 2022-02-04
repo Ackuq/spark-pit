@@ -47,5 +47,4 @@ class SmallData(spark: SparkSession) {
     spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(1)), schema)
   val fg3: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(2)), schema)
-
 }
