@@ -8,7 +8,6 @@ import org.apache.spark.sql.catalyst.expressions.{
   PredicateHelper
 }
 import org.apache.spark.sql.catalyst.plans.logical.{BinaryNode, LogicalPlan}
-import org.apache.spark.sql.catalyst.trees.TreePattern.{JOIN, TreePattern}
 import org.apache.spark.sql.types.BooleanType
 
 sealed abstract class CustomJoinType {
@@ -37,9 +36,6 @@ case class PITJoin(
   override protected lazy val validConstraints: ExpressionSet = {
     left.constraints
   }
-  override val nodePatterns: Seq[TreePattern] = {
-    Seq(JOIN)
-  }
 
   override def maxRows: Option[Long] = {
     left.maxRows
@@ -56,8 +52,4 @@ case class PITJoin(
   def duplicateResolved: Boolean =
     left.outputSet.intersect(right.outputSet).isEmpty
 
-  override protected def withNewChildrenInternal(
-      newLeft: LogicalPlan,
-      newRight: LogicalPlan
-  ): PITJoin = copy(left = newLeft, right = newRight)
 }

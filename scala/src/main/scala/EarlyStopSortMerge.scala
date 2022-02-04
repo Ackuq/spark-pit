@@ -13,7 +13,6 @@ object EarlyStopSortMerge {
   final val PIT_FUNCTION = (_: Column, _: Column) => true
   final val pit: UserDefinedFunction = udf(PIT_FUNCTION).withName(PIT_UDF_NAME)
 
-
   def init(spark: SparkSession): Unit = {
     spark.udf.register(PIT_UDF_NAME, pit)
     spark.experimental.extraStrategies = Seq(CustomStrategy)

@@ -25,8 +25,11 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.plans.physical.{
+  Distribution,
+  HashClusteredDistribution,
   Partitioning,
-  PartitioningCollection
+  PartitioningCollection,
+  UnspecifiedDistribution
 }
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
@@ -44,7 +47,8 @@ case class PITJoinExec(
     left: SparkPlan,
     right: SparkPlan,
     isSkewJoin: Boolean = false
-) extends ShuffledJoin {
+) extends ShuffledJoin
+    with CodegenSupport {
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
@@ -52,6 +56,24 @@ case class PITJoinExec(
       "number of output rows"
     )
   )
+
+  override def nodeName: String = {
+    if (isSkewJoin) super.nodeName + "(skew=true)" else super.nodeName
+  }
+
+  override def stringArgs: Iterator[Any] =
+    super.stringArgs.toSeq.dropRight(1).iterator
+
+  override def requiredChildDistribution: Seq[Distribution] = {
+    if (isSkewJoin) {
+      UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
+    } else {
+      HashClusteredDistribution(leftEquiKeys) :: HashClusteredDistribution(
+        rightEquiKeys
+      ) :: Nil
+    }
+  }
+
   private lazy val (
     (streamedPlan, streamedEquiKeys, streamedPITKeys),
     (bufferedPlan, bufferedEquiKeys, bufferedPITKeys)
@@ -82,7 +104,7 @@ case class PITJoinExec(
   }
 
   override def outputOrdering: Seq[SortOrder] = customJoinType match {
-    // For PIT join, the order should be in descending time order
+    // For PIT join, the order should be in descending time order for both sides
     case PITJoinType => getKeyOrdering(leftKeys, left.outputOrdering)
     case x =>
       throw new IllegalArgumentException(
@@ -117,9 +139,8 @@ case class PITJoinExec(
   }
 
   private def requiredOrders(keys: Seq[Expression]): Seq[SortOrder] = {
-    // This must be ascending in order to agree with the `keyOrdering` defined in `doExecute()`.
+    // This must be descending in order to agree with the `keyOrdering` defined in `doExecute()`.
 
-    // This has been changed to descending
     keys.map(SortOrder(_, Descending))
   }
 
@@ -127,13 +148,6 @@ case class PITJoinExec(
     requiredOrders(leftKeys) :: requiredOrders(rightKeys) :: Nil
 
   override def rightKeys: Seq[Expression] = rightEquiKeys ++ rightPitKeys
-
-  // Keep codegen support of for the moment
-  override def supportCodegen: Boolean = false
-
-  override def inputRDDs(): Seq[RDD[InternalRow]] = {
-    streamedPlan.execute() :: bufferedPlan.execute() :: Nil
-  }
 
   protected override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
@@ -143,12 +157,12 @@ case class PITJoinExec(
         condition
           .map { cond =>
             Predicate.create(cond, left.output ++ right.output).eval _
+
           }
           .getOrElse { (r: InternalRow) =>
             true
           }
       }
-
       // An ordering that can be used to compare keys from both sides.
 
       // Ordering of the equi-keys
@@ -230,6 +244,13 @@ case class PITJoinExec(
     }
   }
 
+  // Keep codegen support of for the moment
+  override def supportCodegen: Boolean = false
+
+  override def inputRDDs(): Seq[RDD[InternalRow]] = {
+    streamedPlan.execute() :: bufferedPlan.execute() :: Nil
+  }
+
   /** These generator are for generating for the equi-keys
     */
 
@@ -249,12 +270,6 @@ case class PITJoinExec(
   private def createRightPITKeyGenerator(): Projection =
     UnsafeProjection.create(rightPitKeys, right.output)
 
-  override protected def withNewChildrenInternal(
-      newLeft: SparkPlan,
-      newRight: SparkPlan
-  ): PITJoinExec =
-    copy(left = newLeft, right = newRight)
-
   // TODO: Add codegen support
   override protected def doProduce(ctx: CodegenContext): String = ???
 }
@@ -268,16 +283,16 @@ case class PITJoinExec(
   * methods return mutable objects which are re-used across calls to the `findNext*JoinRows()`
   * methods.
   *
-  * @param streamedPITKeyGenerator a projection that produces PIT join keys from the streamed input.
-  * @param bufferedPITKeyGenerator a projection that produces PIT join keys from the buffered input.
-  * @param pitKeyOrdering             an ordering which can be used to compare PIT join keys.
+  * @param streamedPITKeyGenerator  a projection that produces PIT join keys from the streamed input.
+  * @param bufferedPITKeyGenerator  a projection that produces PIT join keys from the buffered input.
+  * @param pitKeyOrdering           an ordering which can be used to compare PIT join keys.
   * @param streamedEquiKeyGenerator a projection that produces join keys from the streamed input.
   * @param bufferedEquiKeyGenerator a projection that produces join keys from the buffered input.
-  * @param equiKeyOrdering             an ordering which can be used to compare equi join keys.
-  * @param streamedIter            an input whose rows will be streamed.
-  * @param bufferedIter            an input whose rows will be buffered to construct sequences of rows that
-  *                                have the same join key.
-  * @param eagerCleanupResources   the eager cleanup function to be invoked when no join row found
+  * @param equiKeyOrdering          an ordering which can be used to compare equi join keys.
+  * @param streamedIter             an input whose rows will be streamed.
+  * @param bufferedIter             an input whose rows will be buffered to construct sequences of rows that
+  *                                 have the same join key.
+  * @param eagerCleanupResources    the eager cleanup function to be invoked when no join row found
   */
 class PITJoinScanner(
     streamedPITKeyGenerator: Projection,
@@ -342,8 +357,8 @@ class PITJoinScanner(
       && matchJoinPITKey != null && pitKeyOrdering.compare(
         streamedRowPITKey,
         matchJoinPITKey
-        // Streamed row key must be equal or grater than match
-      ) >= 0
+        // Streamed row key must be equal or greater than match
+      ) <= 0
     ) {
       // The new streamed row has the same join key as the previous row, so return the same matches.
       true
