@@ -23,14 +23,7 @@ import logical.{CustomJoinType, PITJoinType}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen._
-import org.apache.spark.sql.catalyst.plans.physical.{
-  Distribution,
-  HashClusteredDistribution,
-  Partitioning,
-  PartitioningCollection,
-  UnspecifiedDistribution
-}
+import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.joins.ShuffledJoin
@@ -47,8 +40,7 @@ case class PITJoinExec(
     left: SparkPlan,
     right: SparkPlan,
     isSkewJoin: Boolean = false
-) extends ShuffledJoin
-    with CodegenSupport {
+) extends ShuffledJoin {
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
@@ -68,6 +60,7 @@ case class PITJoinExec(
     if (isSkewJoin) {
       UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
     } else {
+      // We only want to partition of left keys, so cluster them only
       HashClusteredDistribution(leftEquiKeys) :: HashClusteredDistribution(
         rightEquiKeys
       ) :: Nil
@@ -85,8 +78,7 @@ case class PITJoinExec(
         s"PITJoin.streamedPlan/bufferedPlan should not take $x as the JoinType"
       )
   }
-  private lazy val streamedOutput = streamedPlan.output
-  private lazy val bufferedOutput = bufferedPlan.output
+
   val customJoinType: CustomJoinType = PITJoinType
 
   // Set as inner
@@ -163,6 +155,7 @@ case class PITJoinExec(
             true
           }
       }
+
       // An ordering that can be used to compare keys from both sides.
 
       // Ordering of the equi-keys
@@ -244,13 +237,6 @@ case class PITJoinExec(
     }
   }
 
-  // Keep codegen support of for the moment
-  override def supportCodegen: Boolean = false
-
-  override def inputRDDs(): Seq[RDD[InternalRow]] = {
-    streamedPlan.execute() :: bufferedPlan.execute() :: Nil
-  }
-
   /** These generator are for generating for the equi-keys
     */
 
@@ -270,8 +256,6 @@ case class PITJoinExec(
   private def createRightPITKeyGenerator(): Projection =
     UnsafeProjection.create(rightPitKeys, right.output)
 
-  // TODO: Add codegen support
-  override protected def doProduce(ctx: CodegenContext): String = ???
 }
 
 /** Helper class that is used to implement [[PITJoinExec]].
@@ -343,6 +327,7 @@ class PITJoinScanner(
       // Advance the streamed side of the join until we find the next row whose join key contains
       // no nulls or we hit the end of the streamed iterator.
     }
+
     val found = if (streamedRow == null) {
       // We have consumed the entire streamed iterator, so there can be no more matches.
       matchJoinEquiKey = null

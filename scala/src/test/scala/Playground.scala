@@ -11,11 +11,12 @@ object Playground {
       .builder()
       .master("local")
       .appName("Spark PIT Tests")
+      .config("spark.sql.adaptive.enabled", true)
       .getOrCreate()
 
     EarlyStopSortMerge.init(spark)
     spark.sparkContext.setLogLevel("WARN")
-    
+
     val smallData = new SmallData(spark)
 
     val fg1 = smallData.fg1
@@ -27,9 +28,13 @@ object Playground {
         fg1("id") === fg2("id") && pit(fg1("ts"), fg2("ts"))
       )
 
-    joinedData.show()
     joinedData.explain()
+    spark.time(joinedData.show())
+    spark.time(UnionAsOf.join(fg1, fg2, rightPrefix = "fg2"))
 
+//    val sortMerge = fg1.hint("MERGE").join(fg2, fg1("id") === fg2("id"))
+//    sortMerge.explain()
+//    sortMerge.show
     //    fg1.createOrReplaceTempView("fg1")
     //    fg2.createOrReplaceTempView("fg2")
     //
