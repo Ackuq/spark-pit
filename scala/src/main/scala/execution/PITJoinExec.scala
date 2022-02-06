@@ -22,7 +22,16 @@ import logical.{CustomJoinType, PITJoinType}
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.codegen.Block.BlockHelper
+import org.apache.spark.sql.catalyst.expressions.codegen.{
+  CodeGenerator,
+  CodegenContext,
+  ExprCode,
+  FalseLiteral,
+  JavaCode
+}
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
@@ -40,7 +49,8 @@ case class PITJoinExec(
     left: SparkPlan,
     right: SparkPlan,
     isSkewJoin: Boolean = false
-) extends ShuffledJoin {
+) extends ShuffledJoin
+    with CodegenSupport {
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
@@ -256,6 +266,341 @@ case class PITJoinExec(
   private def createRightPITKeyGenerator(): Projection =
     UnsafeProjection.create(rightPitKeys, right.output)
 
+  override def inputRDDs(): Seq[RDD[InternalRow]] =
+    left.execute() :: right.execute() :: Nil
+
+  private def copyKeys(
+      ctx: CodegenContext,
+      vars: Seq[ExprCode]
+  ): Seq[ExprCode] = {
+    vars.zipWithIndex.map { case (ev, i) =>
+      ctx.addBufferedState(leftKeys(i).dataType, "value", ev.value)
+    }
+  }
+
+  private def createJoinKeys(
+      ctx: CodegenContext,
+      row: String,
+      pitKeys: Seq[Expression],
+      equiKeys: Seq[Expression],
+      input: Seq[Attribute]
+  ): (Seq[ExprCode], Seq[ExprCode]) = {
+    ctx.INPUT_ROW = row
+    ctx.currentVars = null
+    (
+      bindReferences(pitKeys, input).map(_.genCode(ctx)),
+      bindReferences(equiKeys, input).map(_.genCode(ctx))
+    )
+  }
+
+  private def genComparision(
+      ctx: CodegenContext,
+      a_PIT: Seq[ExprCode],
+      a_EQUI: Seq[ExprCode],
+      b_PIT: Seq[ExprCode],
+      b_EQUI: Seq[ExprCode]
+  ): String = {
+    val comparisons =
+      (
+        a_PIT.zip(a_EQUI).zipWithIndex,
+        b_PIT.zip(b_EQUI).zipWithIndex
+      ).zipped.map { case (((l_PIT, l_EQUI), i), ((r_PIT, r_EQUI), _)) =>
+        s"""
+           |if (equiComp == 0) {
+           |  equiComp = ${ctx.genComp(
+          leftKeys(i).dataType,
+          l_EQUI.value,
+          r_EQUI.value
+        )};
+           |}
+           |if (pitComp >= 0) {
+           |  pitComp = ${ctx.genComp(
+          leftKeys(i).dataType,
+          l_PIT.value,
+          r_PIT.value
+        )};
+           |}
+       """.stripMargin.trim
+      }
+    s"""
+       |equiComp = 0;
+       |pitComp = 0;
+       |${comparisons.mkString("\n")}
+     """.stripMargin
+  }
+
+  /** Creates variables and declarations for left part of result row.
+    *
+    * In order to defer the access after condition and also only access once in the loop,
+    * the variables should be declared separately from accessing the columns, we can't use the
+    * codegen of BoundReference here.
+    */
+  private def createLeftVars(
+      ctx: CodegenContext,
+      leftRow: String
+  ): (Seq[ExprCode], Seq[String]) = {
+    ctx.INPUT_ROW = leftRow
+    left.output.zipWithIndex.map { case (a, i) =>
+      val value = ctx.freshName("value")
+      val valueCode = CodeGenerator.getValue(leftRow, a.dataType, i.toString)
+      val javaType = CodeGenerator.javaType(a.dataType)
+      val defaultValue = CodeGenerator.defaultValue(a.dataType)
+      if (a.nullable) {
+        val isNull = ctx.freshName("isNull")
+        val code =
+          code"""
+                |$isNull = $leftRow.isNullAt($i);
+                |$value = $isNull ? $defaultValue : ($valueCode);
+           """.stripMargin
+        val leftVarsDecl =
+          s"""
+             |boolean $isNull = false;
+             |$javaType $value = $defaultValue;
+           """.stripMargin
+        (
+          ExprCode(
+            code,
+            JavaCode.isNullVariable(isNull),
+            JavaCode.variable(value, a.dataType)
+          ),
+          leftVarsDecl
+        )
+      } else {
+        val code = code"$value = $valueCode;"
+        val leftVarsDecl = s"""$javaType $value = $defaultValue;"""
+        (
+          ExprCode(code, FalseLiteral, JavaCode.variable(value, a.dataType)),
+          leftVarsDecl
+        )
+      }
+    }.unzip
+  }
+
+  /** Creates the variables for right part of result row, using BoundReference, since the right
+    * part are accessed inside the loop.
+    */
+  private def createRightVar(
+      ctx: CodegenContext,
+      rightRow: String
+  ): Seq[ExprCode] = {
+    ctx.INPUT_ROW = rightRow
+    right.output.zipWithIndex.map { case (a, i) =>
+      BoundReference(i, a.dataType, a.nullable).genCode(ctx)
+    }
+  }
+
+  /** Generate a function to scan both left and right to find a match, returns the term for
+    * matched one row from left side and buffered rows from right side.
+    */
+  private def genScanner(ctx: CodegenContext) = {
+    // Create class member for next row from both sides.
+    // Inline mutable state since not many join operations in a task
+    val leftRow =
+      ctx.addMutableState("InternalRow", "leftRow", forceInline = true)
+    val rightRow =
+      ctx.addMutableState("InternalRow", "rightRow", forceInline = true)
+
+    // Create variables fro join keys
+    val (leftPITKeyVars, leftEquiKeyVars) =
+      createJoinKeys(ctx, leftRow, leftPitKeys, leftEquiKeys, left.output)
+    val (leftPITAnyNull, leftEquiAnyNull) = (
+      leftPITKeyVars.map(_.isNull).mkString(" || "),
+      leftEquiKeyVars.map(_.isNull).mkString(" || ")
+    )
+
+    val (rightPITKeyTmpVars, rightEquiKeyTmpVars) =
+      createJoinKeys(ctx, rightRow, rightPitKeys, rightEquiKeys, right.output)
+
+    val (rightPITAnyNull, rightEquiAnyNull) = (
+      rightPITKeyTmpVars.map(_.isNull).mkString(" || "),
+      rightEquiKeyTmpVars.map(_.isNull).mkString(" || ")
+    )
+    // Copy the right key as class members so they could be used in next function call.
+    val rightPITKeyVars = copyKeys(ctx, rightPITKeyTmpVars)
+    val rightEquiKeyVars = copyKeys(ctx, rightEquiKeyTmpVars)
+
+    val matched =
+      ctx.addMutableState("InternalRow", "matched", forceInline = true)
+
+    val matchedPITKeyVars = copyKeys(ctx, leftPITKeyVars)
+    val matchedEquiKeyVars = copyKeys(ctx, leftEquiKeyVars)
+
+    ctx.addNewFunction(
+      "findNextInnerJoinRows",
+      s"""
+         |private boolean findNextInnerJoinRows(
+         |scala.collection.Iterator leftIter,
+         |scala.collection.Iterator rightIter
+         |){
+         |  $leftRow = null;
+         |  int equiComp = 0;
+         |  int pitComp = 0;
+         |  while($leftRow == null) {
+         |    if(!leftIter.hasNext()) return false;
+         |    $leftRow = (InternalRow) leftIter.next();
+         |    ${leftPITKeyVars.map(_.code).mkString("\n")}
+         |    ${leftEquiKeyVars.map(_.code).mkString("\n")}
+         |    if($leftPITAnyNull|| $leftEquiAnyNull) {
+         |      $leftRow = null;
+         |      continue;
+         |    }
+         |    if($matched != null) {
+         |        ${genComparision(
+        ctx,
+        leftPITKeyVars,
+        leftEquiKeyVars,
+        matchedPITKeyVars,
+        matchedEquiKeyVars
+      )}
+         |        if(equiComp == 0 && pitComp >= 0) {
+         |          return true;
+         |        }
+         |        $matched = null;
+         |      }
+         |      do {
+         |        if($rightRow == null) {
+         |          if(!rightIter.hasNext()) {
+         |            ${matchedPITKeyVars.map(_.code).mkString("\n")}
+         |            ${matchedEquiKeyVars.map(_.code).mkString("\n")}
+         |            return $matched != null;
+         |          }
+         |          $rightRow = (InternalRow) rightIter.next();
+         |          ${rightPITKeyTmpVars.map(_.code).mkString("\n")}
+         |          ${rightEquiKeyTmpVars.map(_.code).mkString("\n")}
+         |          if ($rightPITAnyNull|| $rightEquiAnyNull) {
+         |            $rightRow = null;
+         |            continue;
+         |          }
+         |          ${rightPITKeyVars.map(_.code).mkString("\n")}
+         |          ${rightEquiKeyVars.map(_.code).mkString("\n")}
+         |        }
+         |        ${genComparision(
+        ctx,
+        leftPITKeyVars,
+        leftEquiKeyVars,
+        rightPITKeyVars,
+        rightEquiKeyVars
+      )}
+         |        if (equiComp < 0 || pitComp < 0) {
+         |          $rightRow = null;
+         |        } else if (equiComp > 0) {
+         |           $leftRow = null;
+         |        } else {
+         |          $matched = (UnsafeRow) $rightRow;
+         |          ${matchedPITKeyVars.map(_.code).mkString("\n")}
+         |          ${matchedEquiKeyVars.map(_.code).mkString("\n")}
+         |          return true;
+         |        }
+         |      } while($leftRow != null);
+         |  }
+         |  return false;
+         |}
+        """.stripMargin,
+      inlineToOuterClass = true
+    )
+    (leftRow, matched)
+  }
+
+  /** Splits variables based on whether it's used by condition or not, returns the code to create
+    * these variables before the condition and after the condition.
+    *
+    * Only a few columns are used by condition, then we can skip the accessing of those columns
+    * that are not used by condition also filtered out by condition.
+    */
+  private def splitVarsByCondition(
+      attributes: Seq[Attribute],
+      variables: Seq[ExprCode]
+  ): (String, String) = {
+    if (condition.isDefined) {
+      val condRefs = condition.get.references
+      val (used, notUsed) =
+        attributes.zip(variables).partition { case (a, ev) =>
+          condRefs.contains(a)
+        }
+      val beforeCond = evaluateVariables(used.map(_._2))
+      val afterCond = evaluateVariables(notUsed.map(_._2))
+      (beforeCond, afterCond)
+    } else {
+      (evaluateVariables(variables), "")
+    }
+  }
+
+  override def needCopyResult: Boolean = true
+
+  override protected def doProduce(ctx: CodegenContext): String = {
+    // Inline mutable state since not many join operations in a task
+    val leftInput = ctx.addMutableState(
+      "scala.collection.Iterator",
+      "leftInput",
+      v => s"$v = inputs[0];",
+      forceInline = true
+    )
+    val rightInput = ctx.addMutableState(
+      "scala.collection.Iterator",
+      "rightInput",
+      v => s"$v = inputs[1];",
+      forceInline = true
+    )
+
+    val (leftRow, matched) = genScanner(ctx)
+
+    // Create variables for row from both sides.
+    val (leftVars, leftVarDecl) = createLeftVars(ctx, leftRow)
+    val rightRow = ctx.freshName("rightRow")
+    val rightVars = createRightVar(ctx, rightRow)
+
+    val currentMatched = ctx.freshName("currentMatched")
+    val numOutput = metricTerm(ctx, "numOutputRows")
+
+    val (beforeLoop, condCheck) = if (condition.isDefined) {
+      // Split the code of creating variables based on whether it's used by condition or not.
+      val loaded = ctx.freshName("loaded")
+      val (leftBefore, leftAfter) = splitVarsByCondition(left.output, leftVars)
+      val (rightBefore, rightAfter) =
+        splitVarsByCondition(right.output, rightVars)
+      // Generate code for condition
+      ctx.currentVars = leftVars ++ rightVars
+      val cond =
+        BindReferences.bindReference(condition.get, output).genCode(ctx)
+      // evaluate the columns those used by condition before loop
+      val before =
+        s"""
+           |boolean $loaded = false;
+           |$leftBefore
+         """.stripMargin
+
+      val checking =
+        s"""
+           |$rightBefore
+           |${cond.code}
+           |if (${cond.isNull}|| !${cond.value}) continue;
+           |if (!$loaded) {
+           |  $loaded = true;
+           |  $leftAfter
+           |}
+           |$rightAfter
+     """.stripMargin
+      (before, checking)
+    } else {
+      (evaluateVariables(leftVars), "")
+    }
+
+    val thisPlan = ctx.addReferenceObj("plan", this)
+    val eagerCleanup = s"$thisPlan.cleanupResources();"
+
+    s"""
+       |while (findNextInnerJoinRows($leftInput, $rightInput)) {
+       |  ${leftVarDecl.mkString("\n")}
+       |  ${beforeLoop.trim}
+       |  InternalRow $rightRow = (InternalRow) ${matched};
+       |  ${condCheck.trim}
+       |  $numOutput.add(1);
+       |  ${consume(ctx, leftVars ++ rightVars)}
+       |  if (shouldStop()) return;
+       |}
+       |$eagerCleanup
+     """.stripMargin
+  }
 }
 
 /** Helper class that is used to implement [[PITJoinExec]].
