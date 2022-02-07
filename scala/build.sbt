@@ -5,7 +5,7 @@ ThisBuild / scalaVersion := "2.12.10"
 lazy val root = (project in file("."))
   .settings(
     name := "spark-pit",
-    idePackagePrefix := Some("io.github.ackuq")
+    idePackagePrefix := Some("io.github.ackuq.pit")
   )
 
 libraryDependencies ++= Seq(

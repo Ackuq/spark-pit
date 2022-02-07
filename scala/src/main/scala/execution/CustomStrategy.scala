@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 package execution
 
 import org.apache.spark.sql.Strategy

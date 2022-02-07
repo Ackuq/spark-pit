@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 package data
 
 import org.apache.spark.sql.types.{

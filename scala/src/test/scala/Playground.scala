@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 
 import EarlyStopSortMerge.pit
 import data.SmallData

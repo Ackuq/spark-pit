@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package io.github.ackuq
+package io.github.ackuq.pit
 package execution
 
 import logical.{CustomJoinType, PITJoinType}
@@ -25,13 +25,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.BindReferences.bindReferences
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.Block.BlockHelper
-import org.apache.spark.sql.catalyst.expressions.codegen.{
-  CodeGenerator,
-  CodegenContext,
-  ExprCode,
-  FalseLiteral,
-  JavaCode
-}
+import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
@@ -592,7 +586,7 @@ case class PITJoinExec(
        |while (findNextInnerJoinRows($leftInput, $rightInput)) {
        |  ${leftVarDecl.mkString("\n")}
        |  ${beforeLoop.trim}
-       |  InternalRow $rightRow = (InternalRow) ${matched};
+       |  InternalRow $rightRow = (InternalRow) $matched;
        |  ${condCheck.trim}
        |  $numOutput.add(1);
        |  ${consume(ctx, leftVars ++ rightVars)}

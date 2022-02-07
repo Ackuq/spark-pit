@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 package logical
 
 import EarlyStopSortMerge.PIT_UDF_NAME

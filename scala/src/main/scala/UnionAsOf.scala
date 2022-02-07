@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
