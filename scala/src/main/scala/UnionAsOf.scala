@@ -1,4 +1,4 @@
-package io.github.ackuq
+package io.github.ackuq.pit
 
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -10,34 +10,6 @@ object UnionAsOf {
     */
   private val dfIndexCol = "df_index"
   private val combinedTSCol = "df_combined_ts"
-
-  /** Prefix all the columns in a dataframe.
-    *
-    * @param df               A dataframe
-    * @param prefix           The prefix for the column names
-    * @param partitionColumns The partitions columns, these will be ignored
-    * @return The prefixed version of the dataframe
-    */
-  private def prefixDF(
-      df: DataFrame,
-      prefix: String,
-      partitionColumns: Seq[String]
-  ) = {
-    val newColumnsQuery = df.columns.map(col =>
-      if (partitionColumns.contains(col)) df(col) else df(col).as(prefix ++ col)
-    )
-    df.select(newColumnsQuery: _*)
-  }
-
-  /** Add all the columns and fill them with null
-    *
-    * @param df      The dataframe we want to add the columns to
-    * @param columns A sequence of columns
-    * @return
-    */
-  private def addColumns(df: DataFrame, columns: Seq[String]) = {
-    columns.foldLeft(df)(_.withColumn(_, lit(null)))
-  }
 
   /** Perform a backward asof join using the left table for event times.
     *
@@ -140,5 +112,33 @@ object UnionAsOf {
         .drop(combinedTSCol)
 
     asOfDF
+  }
+
+  /** Prefix all the columns in a dataframe.
+    *
+    * @param df               A dataframe
+    * @param prefix           The prefix for the column names
+    * @param partitionColumns The partitions columns, these will be ignored
+    * @return The prefixed version of the dataframe
+    */
+  private def prefixDF(
+      df: DataFrame,
+      prefix: String,
+      partitionColumns: Seq[String]
+  ) = {
+    val newColumnsQuery = df.columns.map(col =>
+      if (partitionColumns.contains(col)) df(col) else df(col).as(prefix ++ col)
+    )
+    df.select(newColumnsQuery: _*)
+  }
+
+  /** Add all the columns and fill them with null
+    *
+    * @param df      The dataframe we want to add the columns to
+    * @param columns A sequence of columns
+    * @return
+    */
+  private def addColumns(df: DataFrame, columns: Seq[String]) = {
+    columns.foldLeft(df)(_.withColumn(_, lit(null)))
   }
 }
