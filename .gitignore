@@ -8,6 +8,7 @@ scala/target
 scala/project/target/
 scala/project/project/target/
 scala/target/stream/*
+scala/src/test/scala/Playground.scala
 .bsp
 
 # ignore build files

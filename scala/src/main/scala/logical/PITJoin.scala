@@ -34,15 +34,15 @@ import org.apache.spark.sql.catalyst.expressions.{
 import org.apache.spark.sql.catalyst.plans.logical.{BinaryNode, LogicalPlan}
 import org.apache.spark.sql.types.BooleanType
 
-sealed abstract class CustomJoinType {
+protected[pit] sealed abstract class CustomJoinType {
   def sql: String
 }
 
-case object PITJoinType extends CustomJoinType {
+protected[pit] case object PITJoinType extends CustomJoinType {
   override def sql: String = "PIT"
 }
 
-case class PITJoin(
+protected[pit] case class PITJoin(
     left: LogicalPlan,
     right: LogicalPlan,
     pitCondition: Expression,

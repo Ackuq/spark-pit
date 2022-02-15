@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.optimizer.JoinSelectionHelper
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.SparkPlan
 
-object CustomStrategy
+protected[pit] object CustomStrategy
     extends Strategy
     with PredicateHelper
     with JoinSelectionHelper {
@@ -65,6 +65,7 @@ object CustomStrategy
       } else {
         Nil
       }
-    case _ => Nil
+    case _ =>
+      Nil
   }
 }
