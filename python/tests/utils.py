@@ -11,9 +11,11 @@ import os
 class SparkTests(unittest.TestCase):
     def setUp(self) -> None:
         self.jar_location = os.environ["SCALA_PIT_JAR"]
+        print("Loading jar from location: {}".format(self.jar_location))
         self.spark = (
             SparkSession.builder.appName("sparkTests")
             .master("local")
+            .config("spark.ui.showConsoleProgress", False)
             .config("spark.driver.extraClassPath", self.jar_location)
             .getOrCreate()
         )
