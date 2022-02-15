@@ -37,9 +37,17 @@ object EarlyStopSortMerge {
   final val pit: UserDefinedFunction = udf(PIT_FUNCTION).withName(PIT_UDF_NAME)
 
   def init(spark: SparkSession): Unit = {
-    spark.udf.register(PIT_UDF_NAME, pit)
-    spark.experimental.extraStrategies = Seq(CustomStrategy)
-    spark.experimental.extraOptimizations = Seq(PITRule)
+    if (!spark.catalog.functionExists(PIT_UDF_NAME)) {
+      spark.udf.register(PIT_UDF_NAME, pit)
+    }
+    if (!spark.experimental.extraStrategies.contains(CustomStrategy)) {
+      spark.experimental.extraStrategies =
+        spark.experimental.extraStrategies :+ CustomStrategy
+    }
+    if (!spark.experimental.extraStrategies.contains(PITRule)) {
+      spark.experimental.extraOptimizations =
+        spark.experimental.extraOptimizations :+ PITRule
+    }
   }
 
   // For the PySpark API
