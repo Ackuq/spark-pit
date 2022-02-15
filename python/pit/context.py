@@ -23,6 +23,7 @@ class PitContext(object):
         self._exploding = self._jvm.io.github.ackuq.pit.Exploding
 
         self._init_early_stop_sort_merge()
+        # TODO: Check that classpaths are available
 
     def _to_scala_seq(self, l: List):
         """
