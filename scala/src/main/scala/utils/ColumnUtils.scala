@@ -23,22 +23,43 @@
  */
 
 package io.github.ackuq.pit
+package utils
 
-import execution.CustomStrategy
-import logical.PITRule
+import org.apache.spark.sql.DataFrame
 
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.{Column, SparkSession}
+private[pit] object ColumnUtils {
+  def assertColumnsInDF(columns: Seq[String], dataFrames: DataFrame*): Unit = {
+    columns.foreach { column =>
+      {
+        dataFrames.foreach(df => {
+          try {
+            df(column)
+          } catch {
+            case _: Throwable =>
+              throw new IllegalArgumentException(
+                s"Partition column $column does not exist in DataFrame"
+              )
+          }
+        })
+      }
+    }
+  }
 
-object EarlyStopSortMerge {
-  private final val PIT_FUNCTION = (_: Column, _: Column) => true
-  final val PIT_UDF_NAME = "PIT"
-  final val pit: UserDefinedFunction = udf(PIT_FUNCTION).withName(PIT_UDF_NAME)
-
-  def init(spark: SparkSession): Unit = {
-    spark.udf.register(PIT_UDF_NAME, pit)
-    spark.experimental.extraStrategies = Seq(CustomStrategy)
-    spark.experimental.extraOptimizations = Seq(PITRule)
+  /** Prefix all the columns in a dataframe.
+    *
+    * @param df               A dataframe
+    * @param prefix           The prefix for the column names
+    * @param ignoreColumns    Columns that are not prefixed
+    * @return The prefixed version of the dataframe
+    */
+  def prefixDF(
+      df: DataFrame,
+      prefix: String,
+      ignoreColumns: Seq[String]
+  ): DataFrame = {
+    val newColumnsQuery = df.columns.map(col =>
+      if (ignoreColumns.contains(col)) df(col) else df(col).as(prefix ++ col)
+    )
+    df.select(newColumnsQuery: _*)
   }
 }

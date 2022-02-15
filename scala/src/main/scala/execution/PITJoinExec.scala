@@ -34,7 +34,7 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
 
 /** Performs a PIT join of two child relations.
   */
-case class PITJoinExec(
+protected[pit] case class PITJoinExec(
     leftPitKeys: Seq[Expression],
     rightPitKeys: Seq[Expression],
     leftEquiKeys: Seq[Expression],
@@ -71,28 +71,14 @@ case class PITJoinExec(
     }
   }
 
-  private lazy val (
-    (streamedPlan, streamedEquiKeys, streamedPITKeys),
-    (bufferedPlan, bufferedEquiKeys, bufferedPITKeys)
-  ) = customJoinType match {
-    case PITJoinType =>
-      ((left, leftEquiKeys, leftPitKeys), (right, rightEquiKeys, rightPitKeys))
-    case x =>
-      throw new IllegalArgumentException(
-        s"PITJoin.streamedPlan/bufferedPlan should not take $x as the JoinType"
-      )
-  }
-
   val customJoinType: CustomJoinType = PITJoinType
 
   // Set as inner
   override def joinType: JoinType = Inner
 
   override def outputPartitioning: Partitioning = customJoinType match {
-    case PITJoinType =>
-      PartitioningCollection(
-        Seq(left.outputPartitioning, right.outputPartitioning)
-      )
+    // Left and right output partitioning should equal in the results
+    case PITJoinType => left.outputPartitioning
     case x =>
       throw new IllegalArgumentException(
         s"${getClass.getSimpleName} not take $x as the JoinType"
@@ -125,7 +111,6 @@ case class PITJoinExec(
     if (SortOrder.orderingSatisfies(childOutputOrdering, requiredOrdering)) {
       keys.zip(childOutputOrdering).map { case (key, childOrder) =>
         val sameOrderExpressionsSet = ExpressionSet(childOrder.children) - key
-
         // Changed to descending
         SortOrder(key, Descending, sameOrderExpressionsSet.toSeq)
       }
@@ -136,7 +121,6 @@ case class PITJoinExec(
 
   private def requiredOrders(keys: Seq[Expression]): Seq[SortOrder] = {
     // This must be descending in order to agree with the `keyOrdering` defined in `doExecute()`.
-
     keys.map(SortOrder(_, Descending))
   }
 
@@ -617,7 +601,7 @@ case class PITJoinExec(
   *                                 have the same join key.
   * @param eagerCleanupResources    the eager cleanup function to be invoked when no join row found
   */
-class PITJoinScanner(
+protected[pit] class PITJoinScanner(
     streamedPITKeyGenerator: Projection,
     bufferedPITKeyGenerator: Projection,
     pitKeyOrdering: Ordering[InternalRow],

@@ -24,6 +24,8 @@
 
 package io.github.ackuq.pit
 
+import utils.ColumnUtils.{assertColumnsInDF, prefixDF}
+
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{coalesce, col, last, lit}
@@ -32,8 +34,8 @@ object UnionAsOf {
 
   /** Intermediate column names
     */
-  private val dfIndexCol = "df_index"
-  private val combinedTSCol = "df_combined_ts"
+  private val DF_INDEX_COLUMN = "df_index"
+  private val COMBINED_TS_COLUMN = "df_combined_ts"
 
   /** Perform a backward asof join using the left table for event times.
     *
@@ -56,25 +58,7 @@ object UnionAsOf {
       partitionCols: Seq[String] = Seq()
   ): DataFrame = {
     // Assert both dataframes have the partition columns
-    partitionCols.foreach { col =>
-      try {
-        left(col)
-      } catch {
-        case _: Throwable =>
-          throw new IllegalArgumentException(
-            s"Partition column $col does not exist on left DataFrame"
-          )
-      }
-      try {
-        right(col)
-      } catch {
-        case _: Throwable =>
-          throw new IllegalArgumentException(
-            s"Partition column $col does not exist on right DataFrame"
-          )
-      }
-
-    }
+    assertColumnsInDF(partitionCols, left, right)
 
     // Rename the columns in left and right dataframes
     val leftPrefixed = leftPrefix match {
@@ -94,12 +78,12 @@ object UnionAsOf {
 
     // Add all the column to both dataframes
     val leftPrefixedAllColumns = addColumns(
-      leftPrefixed.withColumn(dfIndexCol, lit(1)),
+      leftPrefixed.withColumn(DF_INDEX_COLUMN, lit(1)),
       rightPrefixed.columns.filter(!partitionCols.contains(_))
     )
     val rightPrefixedAllColumns =
       addColumns(
-        rightPrefixed.withColumn(dfIndexCol, lit(0)),
+        rightPrefixed.withColumn(DF_INDEX_COLUMN, lit(0)),
         leftPrefixed.columns.filter(!partitionCols.contains(_))
       )
 
@@ -108,15 +92,15 @@ object UnionAsOf {
 
     // Get the combined TS from the dataframes, this will be used for ordering
     val combinedTS = combined.withColumn(
-      combinedTSCol,
+      COMBINED_TS_COLUMN,
       coalesce(combined(leftTS), combined(rightTS))
     )
 
     val orderedCombined =
-      combinedTS.orderBy(combinedTSCol, dfIndexCol)
+      combinedTS.orderBy(COMBINED_TS_COLUMN, DF_INDEX_COLUMN)
 
     val windowSpec = Window
-      .orderBy(combinedTSCol, dfIndexCol)
+      .orderBy(COMBINED_TS_COLUMN, DF_INDEX_COLUMN)
       .partitionBy(
         partitionCols.map(col): _*
       )
@@ -132,28 +116,10 @@ object UnionAsOf {
         )
         // Invalid candidates are those where the left values are not existing
         .filter(col(leftTS).isNotNull)
-        .drop(dfIndexCol)
-        .drop(combinedTSCol)
+        .drop(DF_INDEX_COLUMN)
+        .drop(COMBINED_TS_COLUMN)
 
     asOfDF
-  }
-
-  /** Prefix all the columns in a dataframe.
-    *
-    * @param df               A dataframe
-    * @param prefix           The prefix for the column names
-    * @param partitionColumns The partitions columns, these will be ignored
-    * @return The prefixed version of the dataframe
-    */
-  private def prefixDF(
-      df: DataFrame,
-      prefix: String,
-      partitionColumns: Seq[String]
-  ) = {
-    val newColumnsQuery = df.columns.map(col =>
-      if (partitionColumns.contains(col)) df(col) else df(col).as(prefix ++ col)
-    )
-    df.select(newColumnsQuery: _*)
   }
 
   /** Add all the columns and fill them with null

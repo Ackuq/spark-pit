@@ -41,7 +41,7 @@ import org.apache.spark.sql.catalyst.expressions.{
 }
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-trait ExtractEqualityKeys extends PredicateHelper with Logging {
+protected[pit] trait ExtractEqualityKeys extends PredicateHelper with Logging {
   def getEquiJoinKeys(
       predicates: Seq[Expression],
       left: LogicalPlan,
