@@ -41,4 +41,7 @@ object EarlyStopSortMerge {
     spark.experimental.extraStrategies = Seq(CustomStrategy)
     spark.experimental.extraOptimizations = Seq(PITRule)
   }
+
+  // For the PySpark API
+  def getPit: UserDefinedFunction = pit
 }
