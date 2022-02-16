@@ -24,7 +24,7 @@ class SparkTests(unittest.TestCase):
         self.pit_context = PitContext(self.sql_context)
 
     def tearDown(self) -> None:
-        return super().tearDown()
+        self.spark.stop()
 
     def _assertFieldsEqual(self, a: StructField, b: StructField):
         self.assertEqual(a.name.lower(), b.name.lower())
