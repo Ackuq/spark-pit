@@ -39,14 +39,22 @@ object UnionAsOf {
 
   /** Perform a backward asof join using the left table for event times.
     *
-    * @param left          The left dataframe, will be used as reference
-    * @param right         The right dataframe, will be used to merge
-    * @param leftTSColumn  The column used for timestamps in left DF
-    * @param rightTSColumn The column used for timestamps in right DF
-    * @param leftPrefix    Optional, the prefix for the left columns in result
-    * @param rightPrefix   The prefix for the right columns in result
-    * @param partitionCols The columns used for partitioning, if used
-    * @return The PIT-correct view of the joined dataframes
+    * @param left
+    *   The left dataframe, will be used as reference
+    * @param right
+    *   The right dataframe, will be used to merge
+    * @param leftTSColumn
+    *   The column used for timestamps in left DF
+    * @param rightTSColumn
+    *   The column used for timestamps in right DF
+    * @param leftPrefix
+    *   Optional, the prefix for the left columns in result
+    * @param rightPrefix
+    *   The prefix for the right columns in result
+    * @param partitionCols
+    *   The columns used for partitioning, if used
+    * @return
+    *   The PIT-correct view of the joined dataframes
     */
   def join(
       left: DataFrame,
@@ -124,8 +132,10 @@ object UnionAsOf {
 
   /** Add all the columns and fill them with null
     *
-    * @param df      The dataframe we want to add the columns to
-    * @param columns A sequence of columns
+    * @param df
+    *   The dataframe we want to add the columns to
+    * @param columns
+    *   A sequence of columns
     * @return
     */
   private def addColumns(df: DataFrame, columns: Seq[String]) = {

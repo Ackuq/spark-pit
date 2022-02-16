@@ -96,11 +96,13 @@ protected[pit] case class PITJoinExec(
 
   override def leftKeys: Seq[Expression] = leftEquiKeys ++ leftPitKeys
 
-  /** The utility method to get output ordering for left or right side of the join.
+  /** The utility method to get output ordering for left or right side of the
+    * join.
     *
-    * Returns the required ordering for left or right child if childOutputOrdering does not
-    * satisfy the required ordering; otherwise, which means the child does not need to be sorted
-    * again, returns the required ordering for this child with extra "sameOrderExpressions" from
+    * Returns the required ordering for left or right child if
+    * childOutputOrdering does not satisfy the required ordering; otherwise,
+    * which means the child does not need to be sorted again, returns the
+    * required ordering for this child with extra "sameOrderExpressions" from
     * the child's outputOrdering.
     */
   private def getKeyOrdering(
@@ -286,17 +288,17 @@ protected[pit] case class PITJoinExec(
         s"""
            |if (equiComp == 0) {
            |  equiComp = ${ctx.genComp(
-          leftKeys(i).dataType,
-          l_EQUI.value,
-          r_EQUI.value
-        )};
+            leftKeys(i).dataType,
+            l_EQUI.value,
+            r_EQUI.value
+          )};
            |}
            |if (pitComp >= 0) {
            |  pitComp = ${ctx.genComp(
-          leftKeys(i).dataType,
-          l_PIT.value,
-          r_PIT.value
-        )};
+            leftKeys(i).dataType,
+            l_PIT.value,
+            r_PIT.value
+          )};
            |}
        """.stripMargin.trim
       }
@@ -309,9 +311,9 @@ protected[pit] case class PITJoinExec(
 
   /** Creates variables and declarations for left part of result row.
     *
-    * In order to defer the access after condition and also only access once in the loop,
-    * the variables should be declared separately from accessing the columns, we can't use the
-    * codegen of BoundReference here.
+    * In order to defer the access after condition and also only access once in
+    * the loop, the variables should be declared separately from accessing the
+    * columns, we can't use the codegen of BoundReference here.
     */
   private def createLeftVars(
       ctx: CodegenContext,
@@ -354,8 +356,8 @@ protected[pit] case class PITJoinExec(
     }.unzip
   }
 
-  /** Creates the variables for right part of result row, using BoundReference, since the right
-    * part are accessed inside the loop.
+  /** Creates the variables for right part of result row, using BoundReference,
+    * since the right part are accessed inside the loop.
     */
   private def createRightVar(
       ctx: CodegenContext,
@@ -367,8 +369,9 @@ protected[pit] case class PITJoinExec(
     }
   }
 
-  /** Generate a function to scan both left and right to find a match, returns the term for
-    * matched one row from left side and buffered rows from right side.
+  /** Generate a function to scan both left and right to find a match, returns
+    * the term for matched one row from left side and buffered rows from right
+    * side.
     */
   private def genScanner(ctx: CodegenContext) = {
     // Create class member for next row from both sides.
@@ -424,12 +427,12 @@ protected[pit] case class PITJoinExec(
          |    }
          |    if($matched != null) {
          |        ${genComparision(
-        ctx,
-        leftPITKeyVars,
-        leftEquiKeyVars,
-        matchedPITKeyVars,
-        matchedEquiKeyVars
-      )}
+          ctx,
+          leftPITKeyVars,
+          leftEquiKeyVars,
+          matchedPITKeyVars,
+          matchedEquiKeyVars
+        )}
          |        if(equiComp == 0 && pitComp >= 0) {
          |          return true;
          |        }
@@ -453,12 +456,12 @@ protected[pit] case class PITJoinExec(
          |          ${rightEquiKeyVars.map(_.code).mkString("\n")}
          |        }
          |        ${genComparision(
-        ctx,
-        leftPITKeyVars,
-        leftEquiKeyVars,
-        rightPITKeyVars,
-        rightEquiKeyVars
-      )}
+          ctx,
+          leftPITKeyVars,
+          leftEquiKeyVars,
+          rightPITKeyVars,
+          rightEquiKeyVars
+        )}
          |        if (equiComp < 0 || pitComp < 0) {
          |          $rightRow = null;
          |        } else if (equiComp > 0) {
@@ -479,11 +482,13 @@ protected[pit] case class PITJoinExec(
     (leftRow, matched)
   }
 
-  /** Splits variables based on whether it's used by condition or not, returns the code to create
-    * these variables before the condition and after the condition.
+  /** Splits variables based on whether it's used by condition or not, returns
+    * the code to create these variables before the condition and after the
+    * condition.
     *
-    * Only a few columns are used by condition, then we can skip the accessing of those columns
-    * that are not used by condition also filtered out by condition.
+    * Only a few columns are used by condition, then we can skip the accessing
+    * of those columns that are not used by condition also filtered out by
+    * condition.
     */
   private def splitVarsByCondition(
       attributes: Seq[Attribute],
@@ -583,23 +588,32 @@ protected[pit] case class PITJoinExec(
 
 /** Helper class that is used to implement [[PITJoinExec]].
   *
-  * To perform an inner (outer) join, users of this class call [[findNextInnerJoinRows()]]
-  * which returns `true` if a result has been produced and `false`
-  * otherwise. If a result has been produced, then the caller may call [[getStreamedRow]] to return
-  * the matching row from the streamed input  For efficiency, both of these
-  * methods return mutable objects which are re-used across calls to the `findNext*JoinRows()`
-  * methods.
+  * To perform an inner (outer) join, users of this class call
+  * [[findNextInnerJoinRows()]] which returns `true` if a result has been
+  * produced and `false` otherwise. If a result has been produced, then the
+  * caller may call [[getStreamedRow]] to return the matching row from the
+  * streamed input For efficiency, both of these methods return mutable objects
+  * which are re-used across calls to the `findNext*JoinRows()` methods.
   *
-  * @param streamedPITKeyGenerator  a projection that produces PIT join keys from the streamed input.
-  * @param bufferedPITKeyGenerator  a projection that produces PIT join keys from the buffered input.
-  * @param pitKeyOrdering           an ordering which can be used to compare PIT join keys.
-  * @param streamedEquiKeyGenerator a projection that produces join keys from the streamed input.
-  * @param bufferedEquiKeyGenerator a projection that produces join keys from the buffered input.
-  * @param equiKeyOrdering          an ordering which can be used to compare equi join keys.
-  * @param streamedIter             an input whose rows will be streamed.
-  * @param bufferedIter             an input whose rows will be buffered to construct sequences of rows that
-  *                                 have the same join key.
-  * @param eagerCleanupResources    the eager cleanup function to be invoked when no join row found
+  * @param streamedPITKeyGenerator
+  *   a projection that produces PIT join keys from the streamed input.
+  * @param bufferedPITKeyGenerator
+  *   a projection that produces PIT join keys from the buffered input.
+  * @param pitKeyOrdering
+  *   an ordering which can be used to compare PIT join keys.
+  * @param streamedEquiKeyGenerator
+  *   a projection that produces join keys from the streamed input.
+  * @param bufferedEquiKeyGenerator
+  *   a projection that produces join keys from the buffered input.
+  * @param equiKeyOrdering
+  *   an ordering which can be used to compare equi join keys.
+  * @param streamedIter
+  *   an input whose rows will be streamed.
+  * @param bufferedIter
+  *   an input whose rows will be buffered to construct sequences of rows that
+  *   have the same join key.
+  * @param eagerCleanupResources
+  *   the eager cleanup function to be invoked when no join row found
   */
 protected[pit] class PITJoinScanner(
     streamedPITKeyGenerator: Projection,
@@ -620,7 +634,8 @@ protected[pit] class PITJoinScanner(
   private[this] var bufferedRowEquiKey: InternalRow = _
   private[this] var bufferedRowPITKey: InternalRow = _
 
-  /** The join key for the rows buffered in `bufferedMatches`, or null if `bufferedMatches` is empty
+  /** The join key for the rows buffered in `bufferedMatches`, or null if
+    * `bufferedMatches` is empty
     */
   private[this] var matchJoinEquiKey: InternalRow = _
   private[this] var matchJoinPITKey: InternalRow = _
@@ -637,11 +652,14 @@ protected[pit] class PITJoinScanner(
 
   def getBufferedMatch: UnsafeRow = bufferedMatch
 
-  /** Advances both input iterators, stopping when we have found rows with matching join keys. If no
-    * join rows found, try to do the eager resources cleanup.
+  /** Advances both input iterators, stopping when we have found rows with
+    * matching join keys. If no join rows found, try to do the eager resources
+    * cleanup.
     *
-    * @return true if matching rows have been found and false otherwise. If this returns true, then
-    *         [[getStreamedRow]]  can be called to construct the joinresults.
+    * @return
+    *   true if matching rows have been found and false otherwise. If this
+    *   returns true, then [[getStreamedRow]] can be called to construct the
+    *   joinresults.
     */
   final def findNextInnerJoinRows(): Boolean = {
     while (
@@ -719,7 +737,8 @@ protected[pit] class PITJoinScanner(
 
   /** Advance the streamed iterator and compute the new row's join key.
     *
-    * @return true if the streamed iterator returned a row and false otherwise.
+    * @return
+    *   true if the streamed iterator returned a row and false otherwise.
     */
   private def advancedStreamed(): Boolean = {
     if (streamedIter.advanceNext()) {
@@ -737,7 +756,8 @@ protected[pit] class PITJoinScanner(
 
   /** Advance the buffered iterator until we find a row with join key
     *
-    * @return true if the buffered iterator returned a row and false otherwise.
+    * @return
+    *   true if the buffered iterator returned a row and false otherwise.
     */
   private def advancedBuffered(): Boolean = {
     if (bufferedIter.advanceNext()) {

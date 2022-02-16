@@ -25,7 +25,6 @@
 package io.github.ackuq.pit
 
 import data.SmallDataUnion
-import utils.SparkSessionTestWrapper
 
 import org.scalatest.flatspec.AnyFlatSpec
 

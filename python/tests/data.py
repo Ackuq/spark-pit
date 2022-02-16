@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 
 class SmallData:
@@ -44,25 +44,25 @@ class SmallData:
 class SmallDataSortMerge(SmallData):
 
     PIT_1_2_RAW = [
+        [2, 8, "2y", 2, 8, "2y"],
+        [2, 6, "2x", 2, 6, "2x"],
         [1, 7, "1y", 1, 7, "1y"],
         [1, 5, "1x", 1, 5, "1x"],
         [1, 4, "1z", 1, 4, "1z"],
-        [2, 8, "2y", 2, 8, "2y"],
-        [2, 6, "2x", 2, 6, "2x"],
     ]
     PIT_1_3_RAW = [
+        [2, 8, "2y", 2, 8, "f3-2-8"],
+        [2, 6, "2x", 2, 2, "f3-2-2"],
         [1, 7, "1y", 1, 6, "f3-1-6"],
         [1, 5, "1x", 1, 1, "f3-1-1"],
         [1, 4, "1z", 1, 1, "f3-1-1"],
-        [2, 8, "2y", 2, 8, "f3-2-8"],
-        [2, 6, "2x", 2, 2, "f3-2-2"],
     ]
     PIT_1_2_3_RAW = [
+        [2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"],
+        [2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"],
         [1, 7, "1y", 1, 7, "1y", 1, 6, "f3-1-6"],
         [1, 5, "1x", 1, 5, "1x", 1, 1, "f3-1-1"],
         [1, 4, "1z", 1, 4, "1z", 1, 1, "f3-1-1"],
-        [2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"],
-        [2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"],
     ]
 
     PIT_2_schema: StructType = StructType(

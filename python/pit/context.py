@@ -1,6 +1,8 @@
 from typing import Any, List, Optional
-from pyspark.sql.column import _to_seq, _to_java_column  # type: ignore
-from pyspark.sql import Column, SQLContext, DataFrame
+
+from py4j.java_gateway import JavaPackage
+from pyspark.sql import Column, DataFrame, SQLContext
+from pyspark.sql.column import _to_java_column, _to_seq  # type: ignore
 
 
 class PitContext(object):
@@ -12,6 +14,28 @@ class PitContext(object):
         # Call the init function in the Scala object, will register the strategies and rules
         self._essm.init(self._sql_context.sparkSession._jsparkSession)  # type: ignore
 
+    CLASSPATH_ERROR_MSG = "Java class {} could not be imported, check that it is included in the JVM classpaths."
+
+    def _check_classpath(self):
+        # If the classpath does not exist, then py4j will assume that the references are Java packages instead
+
+        if self._essm is JavaPackage:
+            raise ImportError(
+                self.CLASSPATH_ERROR_MSG.format(
+                    "io.github.ackuq.pit.EarlyStopSortMerge"
+                )
+            )
+
+        if self._union is JavaPackage:
+            raise ImportError(
+                self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.UnionAsOf")
+            )
+
+        if self._exploding is JavaPackage:
+            raise ImportError(
+                self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.Exploding")
+            )
+
     def __init__(self, sql_context: SQLContext) -> None:
         self._sql_context = sql_context
         self._sc = self._sql_context._sc  # type: ignore
@@ -21,16 +45,15 @@ class PitContext(object):
         self._essm = self._jvm.io.github.ackuq.pit.EarlyStopSortMerge
         self._union = self._jvm.io.github.ackuq.pit.UnionAsOf
         self._exploding = self._jvm.io.github.ackuq.pit.Exploding
-
+        self._check_classpath()
         self._init_early_stop_sort_merge()
-        # TODO: Check that classpaths are available
 
-    def _to_scala_seq(self, l: List):
+    def _to_scala_seq(self, list_like: List):
         """
         Converts a list to a Scala sequence.
         """
         return (
-            self._jvm.scala.collection.JavaConverters.asScalaBufferConverter(l)
+            self._jvm.scala.collection.JavaConverters.asScalaBufferConverter(list_like)
             .asScala()
             .toSeq()
         )

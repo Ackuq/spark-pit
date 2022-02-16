@@ -34,12 +34,18 @@ object Exploding {
 
   /** Perform a backward asof join using the left table for event times.
     *
-    * @param left          The left dataframe, will be used as reference
-    * @param right         The right dataframe, will be used to merge
-    * @param leftTSColumn  The column used for timestamps in left DF
-    * @param rightTSColumn The column used for timestamps in right DF
-    * @param partitionCols The columns used for partitioning, if used
-    * @return The PIT-correct view of the joined dataframes
+    * @param left
+    *   The left dataframe, will be used as reference
+    * @param right
+    *   The right dataframe, will be used to merge
+    * @param leftTSColumn
+    *   The column used for timestamps in left DF
+    * @param rightTSColumn
+    *   The column used for timestamps in right DF
+    * @param partitionCols
+    *   The columns used for partitioning, if used
+    * @return
+    *   The PIT-correct view of the joined dataframes
     */
   def join(
       left: DataFrame,
