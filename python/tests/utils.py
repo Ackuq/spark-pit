@@ -1,11 +1,11 @@
-from pyspark import SQLContext
-from pyspark.sql.types import StructType, StructField
-from pyspark.sql import SparkSession
-import unittest
-from pit.context import PitContext
 import os
+import unittest
 
-# SCALA_PIT_JAR='/Users/axel/Projects/spark-pit/scala/target/scala-2.12/spark-pit_2.12-0.1.0.jar' python -m unittest discover -s tests
+from pyspark import SQLContext
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructField, StructType
+
+from pit.context import PitContext
 
 
 class SparkTests(unittest.TestCase):
@@ -17,6 +17,7 @@ class SparkTests(unittest.TestCase):
             .master("local")
             .config("spark.ui.showConsoleProgress", False)
             .config("spark.driver.extraClassPath", self.jar_location)
+            .config("spark.sql.shuffle.partitions", 1)
             .getOrCreate()
         )
         self.sql_context = SQLContext(self.spark.sparkContext)

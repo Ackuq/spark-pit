@@ -26,7 +26,6 @@ package io.github.ackuq.pit
 
 import EarlyStopSortMerge.pit
 import data.SmallDataSortMerge
-import utils.SparkSessionTestWrapper
 
 import org.scalatest.flatspec.AnyFlatSpec
 

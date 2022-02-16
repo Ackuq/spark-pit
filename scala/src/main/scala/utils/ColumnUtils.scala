@@ -47,10 +47,14 @@ private[pit] object ColumnUtils {
 
   /** Prefix all the columns in a dataframe.
     *
-    * @param df               A dataframe
-    * @param prefix           The prefix for the column names
-    * @param ignoreColumns    Columns that are not prefixed
-    * @return The prefixed version of the dataframe
+    * @param df
+    *   A dataframe
+    * @param prefix
+    *   The prefix for the column names
+    * @param ignoreColumns
+    *   Columns that are not prefixed
+    * @return
+    *   The prefixed version of the dataframe
     */
   def prefixDF(
       df: DataFrame,

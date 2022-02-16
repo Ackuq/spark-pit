@@ -83,7 +83,9 @@ protected[pit] trait ExtractEqualityKeys extends PredicateHelper with Logging {
 
 object PITJoinExtractEquality extends ExtractEqualityKeys {
 
-  /** (pitLeftKey, pitRightKey, equiLeftKeys, equiRightKeys, condition, otherPredicates, leftChild, rightChild) */
+  /** (pitLeftKey, pitRightKey, equiLeftKeys, equiRightKeys, condition,
+    * otherPredicates, leftChild, rightChild)
+    */
   type ReturnType = (
       Expression,
       Expression,
@@ -109,7 +111,7 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
         false
       case Equality(l, r) =>
         canEvaluate(l, join.left) && canEvaluate(r, join.right) ||
-          canEvaluate(l, join.right) && canEvaluate(r, join.left)
+        canEvaluate(l, join.right) && canEvaluate(r, join.left)
       case _ => false
     }
     val leftPitKey =

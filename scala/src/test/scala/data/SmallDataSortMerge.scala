@@ -36,25 +36,25 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
 
   private val PIT_1_2_RAW = Seq(
+    Row(2, 8, "2y", 2, 8, "2y"),
+    Row(2, 6, "2x", 2, 6, "2x"),
     Row(1, 7, "1y", 1, 7, "1y"),
     Row(1, 5, "1x", 1, 5, "1x"),
-    Row(1, 4, "1z", 1, 4, "1z"),
-    Row(2, 8, "2y", 2, 8, "2y"),
-    Row(2, 6, "2x", 2, 6, "2x")
+    Row(1, 4, "1z", 1, 4, "1z")
   )
   private val PIT_1_3_RAW = Seq(
+    Row(2, 8, "2y", 2, 8, "f3-2-8"),
+    Row(2, 6, "2x", 2, 2, "f3-2-2"),
     Row(1, 7, "1y", 1, 6, "f3-1-6"),
     Row(1, 5, "1x", 1, 1, "f3-1-1"),
-    Row(1, 4, "1z", 1, 1, "f3-1-1"),
-    Row(2, 8, "2y", 2, 8, "f3-2-8"),
-    Row(2, 6, "2x", 2, 2, "f3-2-2")
+    Row(1, 4, "1z", 1, 1, "f3-1-1")
   )
   private val PIT_1_2_3_RAW = Seq(
+    Row(2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"),
+    Row(2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"),
     Row(1, 7, "1y", 1, 7, "1y", 1, 6, "f3-1-6"),
     Row(1, 5, "1x", 1, 5, "1x", 1, 1, "f3-1-1"),
-    Row(1, 4, "1z", 1, 4, "1z", 1, 1, "f3-1-1"),
-    Row(2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"),
-    Row(2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2")
+    Row(1, 4, "1z", 1, 4, "1z", 1, 1, "f3-1-1")
   )
   private val PIT_2_schema: StructType = StructType(
     Seq(

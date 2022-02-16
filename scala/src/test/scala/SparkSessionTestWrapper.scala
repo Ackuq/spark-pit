@@ -23,7 +23,6 @@
  */
 
 package io.github.ackuq.pit
-package utils
 
 import org.apache.spark.sql.SparkSession
 
@@ -32,6 +31,7 @@ trait SparkSessionTestWrapper {
     .builder()
     .master("local")
     .appName("Spark PIT Tests")
+    .config("spark.ui.showConsoleProgress", value = false)
+    .config("spark.sql.shuffle.partitions", 1)
     .getOrCreate()
-
 }

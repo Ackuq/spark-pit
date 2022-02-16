@@ -22,7 +22,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Build and test
-        run: sbt +test
+        run: sbt "scalafmtCheckAll; +test;"
         working-directory: scala
   test-python:
     runs-on: ubuntu-20.04
@@ -55,8 +55,20 @@ jobs:
         run: sbt +package
         working-directory: scala
       - name: Install Pip dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements_dev.txt
         working-directory: python
+      - name: Check linting
+        run: flake8
+        working-directory: python
+        if: always()
+      - name: Check formatting
+        run: black . --check
+        working-directory: python
+        if: always()
+      - name: Check imports
+        run: isort . --check
+        working-directory: python
+        if: always()
       - name: Run Python tests
         env:
           SCALA_PIT_JAR: ${{ github.workspace }}/scala/target/scala-2.12/spark-pit_2.12-0.1.0.jar
