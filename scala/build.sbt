@@ -1,4 +1,7 @@
-ThisBuild / version := "0.1.0"
+val versionNumberFile = "VERSION"
+val versionNumber = IO.readLines(new File(versionNumberFile))
+
+ThisBuild / version := versionNumber.head
 
 ThisBuild / scalaVersion := "2.12.15"
 
