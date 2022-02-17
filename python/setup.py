@@ -24,12 +24,17 @@
 
 import setuptools
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setuptools.setup(
     name="spark-pit",
-    version="0.1.0",
+    version="0.1.1",
     author="Axel Pettersson",
     author_email="axel@pettersson.cc",
     description="PIT join library for PySpark",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url="https://github.com/Ackuq/spark-pit/",
     keywords=["PySpark", "point-in-time", "joins", "SparkSQL"],
     packages=["ackuq.pit"],
