@@ -4,6 +4,23 @@ This projects aims to expose different ways of executing PIT (Point-in-Time) joi
 
 Apart from utilising existing high-level implementations, a couple of implementations has been made to the Spark internals, specifically the join algorithms for executing a PIT-join.
 
+## Table of contents
+
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+  - [Scala (Spark)](#scala-spark)]
+  - [Python (PySpark)](#python-pyspark)
+- [Quickstart (Python)](#quickstart-python)
+  1. [Creating the context](#1-creating-the-context)
+  2. [Performing a PIT join](#2-performing-a-pit-join)
+     1. [Early stop sort merge](#21-early-stop-sort-merge)
+     2. [Union ASOF merge](#22-union-asof-merge)
+     3. [Exploding PIT join](#23-exploding-pit-join)
+- [QuickStart (Scala)](#quickstart-scala)
+  - [Early stop sort merge](#early-stop-sort-merge)
+  - [Union ASOF merge](#union-asof-merge)
+  - [Exploding PIT join](#exploding-pit-join)
+
 ## Prerequisites
 
 | Dependency      | Version |
