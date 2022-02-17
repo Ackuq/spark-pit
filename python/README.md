@@ -7,3 +7,49 @@ This projects aims to expose different ways of executing PIT-joins, also called 
 ## Prerequisite
 
 In order to run this project in PySpark, you will need to have the JAR file of the Scala implementation be available inside you Spark Session.
+
+## Quickstart
+
+### 1. Creating the context
+
+The object `PitContext` is the entrypoint for all of the functionality of the lirary. You can initialize this context with the following code:
+
+```py
+from pyspark import SQLContext
+from ackuq.pit import PitContext
+
+sql_context = SQLContext(spark.sparkContext)
+pit_context = PitContext(sql_context)
+```
+
+### 2. Performing a PIT join
+
+There are currently 3 ways of executing a PIT join, using an early stop sort merge, union asof algorithm, or with exploding intermediate tables.
+
+#### 2.1. Early stop sort merge
+
+```py
+pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts) & (df1.id == df2.id))
+```
+
+#### 2.2. Union ASOF merge
+
+```py
+pit_join = pit_context.union_as_of(
+        df1,
+        df2,
+        left_prefix="df1_",
+        right_prefix="df2_",
+        partition_cols=["id"],
+)
+```
+
+#### 2.3. Exploding PIT join
+
+```py
+pit_join = pit_context.exploding(
+    df1,
+    df2,
+    partition_cols = ["id"],
+)
+```
