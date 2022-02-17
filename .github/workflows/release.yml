@@ -1,0 +1,68 @@
+name: Publish new version
+
+on: 
+  workflow_dispatch:
+    inputs: 
+      bump_type:
+        description: The type of version bump
+        required: true
+        default: patch
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+
+jobs:
+  publish-scala:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v2
+        with:
+          distribution: temurin
+          # TODO: Support more versions?
+          java-version: 11
+      
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.10.1"
+
+      - name: Cache SBT
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      
+      - name: Set the new version number
+        run: |
+          python scripts/bump_version.py -t ${{ github.event.inputs.bump_type }}
+
+      - name: Get the new version number
+        id: version
+        run: |
+          echo "::set-output name=jar_version::$(cat scala/VERSION)"
+
+      - name: Build artifact
+        run: |
+          sbt package        
+        working-directory: scala
+      
+      - name: Create tag
+        uses: actions-ecosystem/action-push-tag@v1
+        with:
+          tag: v${{ steps.version.outputs.jar_version }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.jar_version }}
+          files: |
+            LICENSE
+            scala/target/scala-2.12/spark-pit_2.12-${{ steps.version.outputs.jar_version }}.jar

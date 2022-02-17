@@ -9,11 +9,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      
       - name: Setup JDK
         uses: actions/setup-java@v2
         with:
           distribution: temurin
           java-version: 11
+      
       - name: Cache SBT
         uses: actions/cache@v2
         with:
@@ -21,23 +23,29 @@ jobs:
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      
       - name: Build and test
-        run: sbt "scalafmtCheckAll; +test;"
+        run: |
+          sbt "scalafmtCheckAll; +test;"
         working-directory: scala
+  
   test-python:
     runs-on: ubuntu-20.04
     needs: test-scala
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      
       - name: Setup JDK
         uses: actions/setup-java@v2
         with:
           distribution: temurin
           java-version: 11
+      
       - uses: actions/setup-python@v2
         with:
           python-version: "3.10.1"
+      
       - name: Cache SBT
         uses: actions/cache@v2
         with:
@@ -51,26 +59,43 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
+      
       - name: Package the artifact
-        run: sbt +package
+        run: |
+          sbt +package
         working-directory: scala
+      
       - name: Install Pip dependencies
-        run: pip install -r requirements_dev.txt
+        run: |
+          pip install -r requirements_dev.txt
         working-directory: python
+      
       - name: Check linting
-        run: flake8
+        run: |
+          flake8
         working-directory: python
         if: always()
+      
       - name: Check formatting
-        run: black . --check
+        run: |
+          black . --check
         working-directory: python
         if: always()
+      
       - name: Check imports
-        run: isort . --check
+        run: |
+          isort . --check
         working-directory: python
         if: always()
+      
+      - name: Get the current package version
+        id: version
+        run: |
+          echo "::set-output name=jar_version::$(cat scala/VERSION)"
+
       - name: Run Python tests
         env:
-          SCALA_PIT_JAR: ${{ github.workspace }}/scala/target/scala-2.12/spark-pit_2.12-0.1.0.jar
-        run: SCALA_PIT_JAR=$SCALA_PIT_JAR python -m unittest discover -s tests
+          SCALA_PIT_JAR: ${{ github.workspace }}/scala/target/scala-2.12/spark-pit_2.12-${{ steps.version.outputs.jar_version }}.jar
+        run: |
+          SCALA_PIT_JAR=$SCALA_PIT_JAR python -m unittest discover -s tests
         working-directory: python
