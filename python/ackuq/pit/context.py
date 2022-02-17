@@ -43,19 +43,19 @@ class PitContext(object):
     def _check_classpath(self):
         # If the classpath does not exist, then py4j will assume that the references are Java packages instead
 
-        if self._essm is JavaPackage:
+        if isinstance(self._essm, JavaPackage):
             raise ImportError(
                 self.CLASSPATH_ERROR_MSG.format(
                     "io.github.ackuq.pit.EarlyStopSortMerge"
                 )
             )
 
-        if self._union is JavaPackage:
+        if isinstance(self._union, JavaPackage):
             raise ImportError(
                 self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.UnionAsOf")
             )
 
-        if self._exploding is JavaPackage:
+        if isinstance(self._exploding, JavaPackage):
             raise ImportError(
                 self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.Exploding")
             )
