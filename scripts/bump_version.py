@@ -63,8 +63,11 @@ if __name__ == "__main__":
 
     if bump_type is BumpType.MAJOR:
         version["major"] += 1
+        version["minor"] = 0
+        version["patch"] = 0
     elif bump_type is BumpType.MINOR:
         version["minor"] += 1
+        version["patch"] = 0
     elif bump_type is BumpType.PATCH:
         version["patch"] += 1
 
