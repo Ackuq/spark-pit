@@ -8,7 +8,7 @@ Apart from utilising existing high-level implementations, a couple of implementa
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-  - [Scala (Spark)](#scala-spark)]
+  - [Scala (Spark)](#scala-spark)
   - [Python (PySpark)](#python-pyspark)
 - [Quickstart (Python)](#quickstart-python)
   1. [Creating the context](#1-creating-the-context)
