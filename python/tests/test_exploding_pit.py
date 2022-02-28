@@ -21,3 +21,50 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
+
+from tests.data import SmallDataExploding
+from tests.utils import SparkTests
+
+
+class ExplodingTest(SparkTests):
+    def setUp(self) -> None:
+        super().setUp()
+        self.small_data = SmallDataExploding(self.spark)
+
+    def test_two_aligned(self):
+        fg1 = self.small_data.fg1
+        fg2 = self.small_data.fg2
+
+        pit_join = self.pit_context.exploding(
+            fg1, fg2, fg1["ts"], fg2["ts"], [(fg1["id"], fg2["id"])]
+        )
+
+        self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_2.schema)
+        self.assertEqual(pit_join.collect(), self.small_data.PIT_1_2.collect())
+
+    def test_two_misaligned(self):
+        fg1 = self.small_data.fg1
+        fg2 = self.small_data.fg3
+
+        pit_join = self.pit_context.exploding(
+            fg1, fg2, fg1["ts"], fg2["ts"], [(fg1["id"], fg2["id"])]
+        )
+
+        self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3.schema)
+        self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3.collect())
+
+    def test_three_misaligned(self):
+        fg1 = self.small_data.fg1
+        fg2 = self.small_data.fg2
+        fg3 = self.small_data.fg3
+
+        left = self.pit_context.exploding(
+            fg1, fg2, fg1["ts"], fg2["ts"], [(fg1["id"], fg2["id"])]
+        )
+
+        pit_join = self.pit_context.exploding(
+            left, fg3, fg1["ts"], fg3["ts"], [(fg1["id"], fg3["id"])]
+        )
+
+        self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_2_3.schema)
+        self.assertEqual(pit_join.collect(), self.small_data.PIT_1_2_3.collect())

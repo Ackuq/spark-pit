@@ -22,7 +22,7 @@
 # SOFTWARE.
 #
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from py4j.java_gateway import JavaPackage
 from pyspark.sql import Column, DataFrame, SQLContext
@@ -82,8 +82,14 @@ class PitContext(object):
             .toSeq()
         )
 
+    def _to_scala_tuple(self, tuple: Tuple):
+        """
+        Converts a Python tuple to Scala tuple
+        """
+        return self._jvm.__getattr__("scala.Tuple" + str(len(tuple)))(*tuple)
+
     def _scala_none(self):
-        return getattr(getattr(self._jvm.scala, "None$"), "MODULE$")
+        return self._jvm.scala.__getattr__("None$").__getattr__("MODULE$")
 
     def _to_scala_option(self, x: Optional[Any]):
         return self._jvm.scala.Some(x) if x is not None else self._scala_none()
@@ -137,9 +143,9 @@ class PitContext(object):
         self,
         left: DataFrame,
         right: DataFrame,
-        left_ts_column: str = "ts",
-        right_ts_column: str = "ts",
-        partition_cols: List[str] = [],
+        left_ts_column: Column,
+        right_ts_column: Column,
+        partition_cols: List[Tuple[Column, Column]] = [],
     ):
         """
         Perform a backward asof join using the left table for event times.
@@ -150,13 +156,14 @@ class PitContext(object):
         :param right_ts_column The column used for timestamps in right DF
         :param partition_cols The columns used for partitioning, if used
         """
+        _partition_cols = map(lambda p: self._to_scala_tuple((p[0]._jc, p[1]._jc)), partition_cols)  # type: ignore
         return DataFrame(
             self._exploding.join(
                 left._jdf,
                 right._jdf,
-                left_ts_column,
-                right_ts_column,
-                self._to_scala_seq(partition_cols),
+                left_ts_column._jc,  # type: ignore
+                right_ts_column._jc,  # type: ignore
+                self._to_scala_seq(list(_partition_cols)),
             ),
             self._sql_context,
         )
