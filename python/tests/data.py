@@ -182,3 +182,63 @@ class SmallDataUnion(SmallData):
         self.PIT_1_2_3 = spark.createDataFrame(
             spark.sparkContext.parallelize(self.PIT_1_2_3_RAW), self.PIT_3_schema
         )
+
+
+class SmallDataExploding(SmallData):
+    PIT_1_2_RAW = [
+        [1, 4, "1z", 1, 4, "1z"],
+        [1, 5, "1x", 1, 5, "1x"],
+        [1, 7, "1y", 1, 7, "1y"],
+        [2, 6, "2x", 2, 6, "2x"],
+        [2, 8, "2y", 2, 8, "2y"],
+    ]
+    PIT_1_3_RAW = [
+        [1, 4, "1z", 1, 1, "f3-1-1"],
+        [1, 5, "1x", 1, 1, "f3-1-1"],
+        [1, 7, "1y", 1, 6, "f3-1-6"],
+        [2, 6, "2x", 2, 2, "f3-2-2"],
+        [2, 8, "2y", 2, 8, "f3-2-8"],
+    ]
+    PIT_1_2_3_RAW = [
+        [1, 4, "1z", 1, 4, "1z", 1, 1, "f3-1-1"],
+        [1, 5, "1x", 1, 5, "1x", 1, 1, "f3-1-1"],
+        [1, 7, "1y", 1, 7, "1y", 1, 6, "f3-1-6"],
+        [2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"],
+        [2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"],
+    ]
+
+    PIT_2_schema: StructType = StructType(
+        [
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+        ]
+    )
+    PIT_3_schema: StructType = StructType(
+        [
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+        ]
+    )
+
+    def __init__(self, spark: SparkSession) -> None:
+        super().__init__(spark)
+        self.PIT_1_2 = spark.createDataFrame(
+            spark.sparkContext.parallelize(self.PIT_1_2_RAW), self.PIT_2_schema
+        )
+        self.PIT_1_3 = spark.createDataFrame(
+            spark.sparkContext.parallelize(self.PIT_1_3_RAW), self.PIT_2_schema
+        )
+        self.PIT_1_2_3 = spark.createDataFrame(
+            spark.sparkContext.parallelize(self.PIT_1_2_3_RAW), self.PIT_3_schema
+        )

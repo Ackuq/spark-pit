@@ -24,11 +24,9 @@
 
 package io.github.ackuq.pit
 
-import utils.ColumnUtils.assertColumnsInDF
-
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, row_number}
+import org.apache.spark.sql.{Column, DataFrame}
 
 object Exploding {
 
@@ -43,27 +41,27 @@ object Exploding {
     * @param rightTSColumn
     *   The column used for timestamps in right DF
     * @param partitionCols
-    *   The columns used for partitioning, if used
+    *   The columns used for partitioning, is a tuple consisting of left
+    *   partition column and right partition column
     * @return
     *   The PIT-correct view of the joined dataframes
     */
   def join(
       left: DataFrame,
       right: DataFrame,
-      leftTSColumn: String = "ts",
-      rightTSColumn: String = "ts",
-      partitionCols: Seq[String] = Seq()
+      leftTSColumn: Column,
+      rightTSColumn: Column,
+      partitionCols: Seq[(Column, Column)] = Seq()
   ): DataFrame = {
-    if (partitionCols.nonEmpty) {
-      assertColumnsInDF(partitionCols, left, right)
-    }
-
+    // Create the equality conditions of the partitioning column
     val partitionConditions =
-      partitionCols.map(colName => left(colName) === right(colName))
+      partitionCols.map(col => col._1 === col._2)
 
+    // Combine the partitioning conditions with the PIT condition
     val joinConditions =
-      partitionConditions :+ (left(leftTSColumn) >= right(rightTSColumn))
+      partitionConditions :+ (leftTSColumn >= rightTSColumn)
 
+    // Reduce the sequence of conditions to a single one
     val joinCondition =
       joinConditions.reduce((current, previous) => current.and(previous))
 
@@ -73,14 +71,17 @@ object Exploding {
       joinCondition
     )
 
-    val windowPartitionCols = partitionCols.map(left(_)) :+ left(leftTSColumn)
+    // Partition each window using the partitioning columns of the left DataFrame
+    val windowPartitionCols = partitionCols.map(_._1) :+ leftTSColumn
 
+    // Create the Window specification
     val windowSpec =
       Window
         .partitionBy(windowPartitionCols: _*)
-        .orderBy(left(leftTSColumn).desc, right(rightTSColumn).desc)
+        .orderBy(rightTSColumn.desc)
 
     combined
+      // Take only the row with the highest timestamps within each window frame
       .withColumn("rn", row_number().over(windowSpec))
       .where(col("rn") === 1)
       .drop("rn")

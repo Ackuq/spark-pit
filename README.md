@@ -79,10 +79,12 @@ pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts) & (df1.id == df2.i
 
 ```py
 pit_join = pit_context.union_as_of(
-        df1,
-        df2,
+        left=df1,
+        right=df2,
         left_prefix="df1_",
         right_prefix="df2_",
+        left_ts_column = "ts",
+        right_ts_column = "ts",
         partition_cols=["id"],
 )
 ```
@@ -91,9 +93,11 @@ pit_join = pit_context.union_as_of(
 
 ```py
 pit_join = pit_context.exploding(
-    df1,
-    df2,
-    partition_cols = ["id"],
+    left=df1,
+    right=df2,
+    left_ts_column=df1["ts"],
+    right_ts_column=df2["ts"],
+    partition_cols = [df1["id"], df2["id"]],
 )
 ```
 
@@ -134,6 +138,8 @@ import io.github.ackuq.pit.Exploding
 val pitJoin = Exploding.join(
     df1,
     df2,
-    partitionCols = Seq("id")
+    leftTSColumn = df1("ts"),
+    rightTSColumn = df2("ts"),
+    partitionCols = Seq((df1("id"), df2("id")))
 )
 ```
