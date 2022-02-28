@@ -104,9 +104,6 @@ object UnionAsOf {
       coalesce(combined(leftTS), combined(rightTS))
     )
 
-    val orderedCombined =
-      combinedTS.orderBy(COMBINED_TS_COLUMN, DF_INDEX_COLUMN)
-
     val windowSpec = Window
       .orderBy(COMBINED_TS_COLUMN, DF_INDEX_COLUMN)
       .partitionBy(
@@ -119,7 +116,7 @@ object UnionAsOf {
     // TODO: Could we be able to not slide through all of the rows?
     val asOfDF =
       rightPrefixed.columns
-        .foldLeft(orderedCombined)((df, col) =>
+        .foldLeft(combinedTS)((df, col) =>
           df.withColumn(col, last(df(col), ignoreNulls = true).over(windowSpec))
         )
         // Invalid candidates are those where the left values are not existing
