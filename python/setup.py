@@ -24,12 +24,15 @@
 
 import setuptools
 
+with open("VERSION", "r", encoding="utf-8") as vf:
+    version = vf.read()
+
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="spark-pit",
-    version="0.1.2",
+    version=version,
     author="Axel Pettersson",
     author_email="axel@pettersson.cc",
     description="PIT join library for PySpark",
