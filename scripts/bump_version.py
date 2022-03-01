@@ -2,10 +2,11 @@ import argparse
 import re
 from argparse import ArgumentParser
 from enum import Enum
-from typing import TypedDict
-import sys
+from io import TextIOWrapper
+from typing import Tuple, TypedDict
 
-VERSION_FILE_NAME = "scala/VERSION"
+SCALA_VERSION_FILE_NAME = "scala/VERSION"
+PYTHON_VERSION_FILE_NAME = "python/VERSION"
 
 
 class VersionDict(TypedDict):
@@ -18,6 +19,14 @@ class BumpType(Enum):
     MAJOR = "major"
     MINOR = "minor"
     PATCH = "patch"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class Environment(Enum):
+    SCALA = "scala"
+    PYTHON = "python"
 
     def __str__(self) -> str:
         return self.value
@@ -37,9 +46,20 @@ def validate_version(s: str) -> VersionDict:
             "minor": int(group_dict["minor"]),
             "patch": int(group_dict["patch"]),
         }
-    except:
+    except Exception:
         msg = "not a valid version: {}".format(s)
         raise argparse.ArgumentTypeError(msg)
+
+
+def get_current(env: Environment) -> Tuple[VersionDict, TextIOWrapper]:
+    if env is Environment.SCALA:
+        version_file = open(SCALA_VERSION_FILE_NAME, "r+")
+    elif env is Environment.PYTHON:
+        version_file = open(PYTHON_VERSION_FILE_NAME, "r+")
+    else:
+        raise Exception("Unknown environment {}".format(env))
+
+    return validate_version(version_file.readline()), version_file
 
 
 if __name__ == "__main__":
@@ -54,11 +74,19 @@ if __name__ == "__main__":
         help="Type of bump",
     )
 
+    argument_parser.add_argument(
+        "--environment",
+        "-e",
+        type=Environment,
+        choices=list(Environment),
+        required=True,
+        help="Type of bump",
+    )
+
     args = argument_parser.parse_args()
 
     # Get the old version
-    version_file = open(VERSION_FILE_NAME, "r+")
-    version: VersionDict = validate_version(version_file.readline())
+    version, version_file = get_current(args.environment)
     bump_type: BumpType = args.bump_type
 
     if bump_type is BumpType.MAJOR:

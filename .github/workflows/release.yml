@@ -42,7 +42,7 @@ jobs:
       
       - name: Set the new version number
         run: |
-          python scripts/bump_version.py -t ${{ github.event.inputs.bump_type }}
+          python scripts/bump_version.py -t ${{ github.event.inputs.bump_type }} -e scala
 
       - name: Get the new version number
         id: version
