@@ -31,17 +31,23 @@ from pyspark.sql.column import _to_java_column, _to_seq  # type: ignore
 
 class PitContext(object):
     """
-    Entrypoint for all the functionality. Essentially a wrapper for the Scala functions.
+    Entrypoint for all the functionality.
+    Essentially a wrapper for the Scala functions.
     """
 
     def _init_early_stop_sort_merge(self) -> None:
-        # Call the init function in the Scala object, will register the strategies and rules
+        # Call the init function in the Scala object,
+        # will register the strategies and rules
         self._essm.init(self._sql_context.sparkSession._jsparkSession)  # type: ignore
 
-    CLASSPATH_ERROR_MSG = "Java class {} could not be imported, check that it is included in the JVM classpaths."
+    CLASSPATH_ERROR_MSG = (
+        "Java class {} could not be imported, check that it is included in the JVM"
+        " classpaths."
+    )
 
     def _check_classpath(self):
-        # If the classpath does not exist, then py4j will assume that the references are Java packages instead
+        # If the classpath does not exist py4j will assume
+        # that the references are Java packages instead
 
         if isinstance(self._essm, JavaPackage):
             raise ImportError(
@@ -99,10 +105,8 @@ class PitContext(object):
         Used for executing an early stop sort merge join by using custom UDF.
 
         """
-        _pit_udf = self._essm.getPit()  # type: ignore
-        return Column(
-            _pit_udf.apply(_to_seq(self._sc, [left, right], _to_java_column))  # type: ignore
-        )
+        _pit_udf = self._essm.getPit()
+        return Column(_pit_udf.apply(_to_seq(self._sc, [left, right], _to_java_column)))
 
     def union_as_of(
         self,
@@ -156,7 +160,9 @@ class PitContext(object):
         :param right_ts_column The column used for timestamps in right DF
         :param partition_cols The columns used for partitioning, if used
         """
-        _partition_cols = map(lambda p: self._to_scala_tuple((p[0]._jc, p[1]._jc)), partition_cols)  # type: ignore
+        _partition_cols = map(
+            lambda p: self._to_scala_tuple((p[0]._jc, p[1]._jc)), partition_cols
+        )
         return DataFrame(
             self._exploding.join(
                 left._jdf,

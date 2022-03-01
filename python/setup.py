@@ -24,12 +24,16 @@
 
 import setuptools
 
+with open("VERSION", "r", encoding="utf-8") as fp:
+    version = fp.read()
+
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+
 setuptools.setup(
     name="spark-pit",
-    version="0.1.2",
+    version=version,
     author="Axel Pettersson",
     author_email="axel@pettersson.cc",
     description="PIT join library for PySpark",
@@ -38,7 +42,7 @@ setuptools.setup(
     url="https://github.com/Ackuq/spark-pit/",
     keywords=["PySpark", "point-in-time", "joins", "SparkSQL"],
     packages=["ackuq.pit"],
-    install_requires=[],
+    install_requires=["pyspark"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "Development Status :: 4 - Beta",
