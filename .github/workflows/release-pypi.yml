@@ -42,7 +42,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add python/VERSION
-          git commit -m "Publish version ${{ steps.version.outputs.pypi_version }}"
+          git commit -m "Publish PyPi version ${{ steps.version.outputs.pypi_version }}"
           git push
 
       - name: Build the output file
