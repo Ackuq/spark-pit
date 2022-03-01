@@ -14,7 +14,7 @@ on:
           - patch
 
 jobs:
-  publish-scala:
+  publish-pypi:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
