@@ -427,54 +427,39 @@ protected[pit] case class PITJoinExec(
          |      $leftRow = null;
          |      continue;
          |    }
-         |    if($matched != null) {
-         |        ${genComparision(
-          ctx,
-          leftPITKeyVars,
-          leftEquiKeyVars,
-          matchedPITKeyVars,
-          matchedEquiKeyVars
-        )}
-         |        if(equiComp == 0 && pitComp >= 0) {
-         |          return true;
+         |    do {
+         |      if($rightRow == null) {
+         |        if(!rightIter.hasNext()) {
+         |          return false;
          |        }
-         |        $matched = null;
+         |        $rightRow = (InternalRow) rightIter.next();
+         |        ${rightPITKeyTmpVars.map(_.code).mkString("\n")}
+         |        ${rightEquiKeyTmpVars.map(_.code).mkString("\n")}
+         |        if ($rightPITAnyNull|| $rightEquiAnyNull) {
+         |          $rightRow = null;
+         |          continue;
+         |        }
+         |        ${rightPITKeyVars.map(_.code).mkString("\n")}
+         |        ${rightEquiKeyVars.map(_.code).mkString("\n")}
          |      }
-         |      do {
-         |        if($rightRow == null) {
-         |          if(!rightIter.hasNext()) {
-         |            ${matchedPITKeyVars.map(_.code).mkString("\n")}
-         |            ${matchedEquiKeyVars.map(_.code).mkString("\n")}
-         |            return $matched != null;
-         |          }
-         |          $rightRow = (InternalRow) rightIter.next();
-         |          ${rightPITKeyTmpVars.map(_.code).mkString("\n")}
-         |          ${rightEquiKeyTmpVars.map(_.code).mkString("\n")}
-         |          if ($rightPITAnyNull|| $rightEquiAnyNull) {
-         |            $rightRow = null;
-         |            continue;
-         |          }
-         |          ${rightPITKeyVars.map(_.code).mkString("\n")}
-         |          ${rightEquiKeyVars.map(_.code).mkString("\n")}
-         |        }
-         |        ${genComparision(
+         |      ${genComparision(
           ctx,
           leftPITKeyVars,
           leftEquiKeyVars,
           rightPITKeyVars,
           rightEquiKeyVars
         )}
-         |        if (equiComp < 0 || pitComp < 0) {
-         |          $rightRow = null;
-         |        } else if (equiComp > 0) {
-         |           $leftRow = null;
-         |        } else {
-         |          $matched = (UnsafeRow) $rightRow;
-         |          ${matchedPITKeyVars.map(_.code).mkString("\n")}
-         |          ${matchedEquiKeyVars.map(_.code).mkString("\n")}
-         |          return true;
-         |        }
-         |      } while($leftRow != null);
+         |      if (equiComp > 0) {
+         |        $leftRow = null;
+         |      } else if (equiComp < 0 || pitComp < 0) {
+         |        $rightRow = null;
+         |      } else {
+         |        $matched = (UnsafeRow) $rightRow;
+         |        ${matchedPITKeyVars.map(_.code).mkString("\n")}
+         |        ${matchedEquiKeyVars.map(_.code).mkString("\n")}
+         |        return true;
+         |      }
+         |    } while($leftRow != null);
          |  }
          |  return false;
          |}
@@ -534,7 +519,6 @@ protected[pit] case class PITJoinExec(
     val rightRow = ctx.freshName("rightRow")
     val rightVars = createRightVar(ctx, rightRow)
 
-    val currentMatched = ctx.freshName("currentMatched")
     val numOutput = metricTerm(ctx, "numOutputRows")
 
     val (beforeLoop, condCheck) = if (condition.isDefined) {
