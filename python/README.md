@@ -32,10 +32,10 @@ There are currently 3 ways of executing a PIT join, using an early stop sort mer
 pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts) & (df1.id == df2.id))
 ```
 
-#### 2.2. Union ASOF merge
+#### 2.2. Union merge
 
 ```py
-pit_join = pit_context.union_as_of(
+pit_join = pit_context.union(
         left=df1,
         right=df2,
         left_prefix="df1_",

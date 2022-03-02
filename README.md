@@ -14,7 +14,7 @@ Apart from utilising existing high-level implementations, a couple of implementa
   1. [Creating the context](#1-creating-the-context)
   2. [Performing a PIT join](#2-performing-a-pit-join)
      1. [Early stop sort merge](#21-early-stop-sort-merge)
-     2. [Union ASOF merge](#22-union-asof-merge)
+     2. [Union merge](#22-union-merge)
      3. [Exploding PIT join](#23-exploding-pit-join)
 - [QuickStart (Scala)](#quickstart-scala)
   - [Early stop sort merge](#early-stop-sort-merge)
@@ -67,7 +67,7 @@ pit_context = PitContext(sql_context)
 
 ### 2. Performing a PIT join
 
-There are currently 3 ways of executing a PIT join, using an early stop sort merge, union asof algorithm, or with exploding intermediate tables.
+There are currently 3 ways of executing a PIT join, using an early stop sort merge, union merge algorithm, or with exploding intermediate tables.
 
 #### 2.1. Early stop sort merge
 
@@ -75,10 +75,10 @@ There are currently 3 ways of executing a PIT join, using an early stop sort mer
 pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts) & (df1.id == df2.id))
 ```
 
-#### 2.2. Union ASOF merge
+#### 2.2. Union merge
 
 ```py
-pit_join = pit_context.union_as_of(
+pit_join = pit_context.union(
         left=df1,
         right=df2,
         left_prefix="df1_",
@@ -116,12 +116,12 @@ init(spark)
 val pitJoin = df1.join(df2, pit(df1("ts"), df2("ts")) && df1("id") === df2("id"))
 ```
 
-### Union ASOF merge
+### Union merge
 
 ```scala
-import io.github.ackuq.pit.UnionAsOf
+import io.github.ackuq.pit.Union
 
-val pitJoin = UnionAsOf.join(
+val pitJoin = Union.join(
     df1,
     df2,
     leftPrefix = Some("df1_"),
