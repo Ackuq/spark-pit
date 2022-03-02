@@ -28,7 +28,7 @@ import data.SmallDataUnion
 
 import org.scalatest.flatspec.AnyFlatSpec
 
-class Union extends AnyFlatSpec with SparkSessionTestWrapper {
+class UnionTests extends AnyFlatSpec with SparkSessionTestWrapper {
   val smallData = new SmallDataUnion(spark)
 
   it should "Perform a PIT join with two dataframes, aligned timestamps" in {

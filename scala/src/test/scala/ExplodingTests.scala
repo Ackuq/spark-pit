@@ -24,8 +24,7 @@
 
 package io.github.ackuq.pit
 
-import EarlyStopSortMerge.pit
-import data.{SmallDataExploding, SmallDataSortMerge}
+import data.SmallDataExploding
 
 import org.scalatest.flatspec.AnyFlatSpec
 
