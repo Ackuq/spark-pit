@@ -30,7 +30,7 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{coalesce, col, last, lit}
 
-object UnionAsOf {
+object Union {
 
   /** Intermediate column names
     */

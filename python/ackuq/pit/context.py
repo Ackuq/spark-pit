@@ -58,7 +58,7 @@ class PitContext(object):
 
         if isinstance(self._union, JavaPackage):
             raise ImportError(
-                self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.UnionAsOf")
+                self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.Union")
             )
 
         if isinstance(self._exploding, JavaPackage):
@@ -73,7 +73,7 @@ class PitContext(object):
         self._jvm = self._sc._jvm
 
         self._essm = self._jvm.io.github.ackuq.pit.EarlyStopSortMerge
-        self._union = self._jvm.io.github.ackuq.pit.UnionAsOf
+        self._union = self._jvm.io.github.ackuq.pit.Union
         self._exploding = self._jvm.io.github.ackuq.pit.Exploding
         self._check_classpath()
         self._init_early_stop_sort_merge()
@@ -108,7 +108,7 @@ class PitContext(object):
         _pit_udf = self._essm.getPit()
         return Column(_pit_udf.apply(_to_seq(self._sc, [left, right], _to_java_column)))
 
-    def union_as_of(
+    def union(
         self,
         left: DataFrame,
         right: DataFrame,
