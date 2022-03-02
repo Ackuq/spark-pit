@@ -121,6 +121,7 @@ object Union {
         )
         // Invalid candidates are those where the left values are not existing
         .filter(col(leftTS).isNotNull)
+        .filter(col(rightTS).isNotNull)
         .drop(DF_INDEX_COLUMN)
         .drop(COMBINED_TS_COLUMN)
 
