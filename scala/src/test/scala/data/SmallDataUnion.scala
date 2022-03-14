@@ -57,7 +57,7 @@ class SmallDataUnion(spark: SparkSession) extends SmallData(spark) {
   )
   private val PIT_2_schema: StructType = StructType(
     Seq(
-      StructField("id", IntegerType, nullable = true),
+      StructField("id", IntegerType, nullable = false),
       StructField("fg1_ts", IntegerType, nullable = true),
       StructField("fg1_value", StringType, nullable = true),
       StructField("fg2_ts", IntegerType, nullable = true),
@@ -66,7 +66,7 @@ class SmallDataUnion(spark: SparkSession) extends SmallData(spark) {
   )
   private val PIT_3_schema: StructType = StructType(
     Seq(
-      StructField("id", IntegerType, nullable = true),
+      StructField("id", IntegerType, nullable = false),
       StructField("fg1_ts", IntegerType, nullable = true),
       StructField("fg1_value", StringType, nullable = true),
       StructField("fg2_ts", IntegerType, nullable = true),
