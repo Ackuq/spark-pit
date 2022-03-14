@@ -109,13 +109,14 @@ object Union {
       .partitionBy(
         partitionCols.map(col): _*
       )
-      // TODO: Could we bound the start value?
       .rowsBetween(Window.unboundedPreceding, Window.currentRow)
 
+    // Get all non-partitioning columns
+    val rightColumns = rightPrefixed.columns.filter(!partitionCols.contains(_))
+
     // To perform the join, a window is slides through all the rows and merges each row with the last right values
-    // TODO: Could we be able to not slide through all of the rows?
     val asOfDF =
-      rightPrefixed.columns
+      rightColumns
         .foldLeft(combinedTS)((df, col) =>
           df.withColumn(col, last(df(col), ignoreNulls = true).over(windowSpec))
         )
