@@ -43,6 +43,8 @@ protected[pit] object CustomStrategy
           leftEquiKeys,
           rightEquiKeys,
           nonEquiCond,
+          returnNulls,
+          tolerance,
           left,
           right
         ) =>
@@ -60,7 +62,9 @@ protected[pit] object CustomStrategy
             rightEquiKeys,
             nonEquiCond,
             planLater(left),
-            planLater(right)
+            planLater(right),
+            returnNulls,
+            tolerance
           )
         )
       } else {

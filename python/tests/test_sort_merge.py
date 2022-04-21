@@ -72,3 +72,28 @@ class SortMergeUnionAsOfTest(SparkTests):
 
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_2_3.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_2_3.collect())
+
+    def test_two_tolerance(self):
+        fg1 = self.small_data.fg1
+        fg2 = self.small_data.fg3
+
+        pit_join = fg1.join(
+            fg2,
+            self.pit_context.pit_udf(fg1["ts"], fg2["ts"], 1)
+            & (fg1["id"] == fg2["id"]),
+        )
+        self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3_T1.schema)
+        self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3_T1.collect())
+
+    def test_two_tolerance_outer(self):
+        fg1 = self.small_data.fg1
+        fg2 = self.small_data.fg3
+
+        pit_join = fg1.join(
+            fg2,
+            self.pit_context.pit_udf(fg1["ts"], fg2["ts"], 1)
+            & (fg1["id"] == fg2["id"]),
+            "left",
+        )
+        self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3_T1_OUTER.schema)
+        self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3_T1_OUTER.collect())

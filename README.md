@@ -109,11 +109,29 @@ Instead of using a context, which is done in the Python implementation, all of t
 
 ```scala
 import io.github.ackuq.pit.EarlyStopSortMerge.{pit, init}
+import org.apache.spark.sql.functions.lit
 
 // Pass the spark session, this will register the required stratergies and optimizer rules.
 init(spark)
 
-val pitJoin = df1.join(df2, pit(df1("ts"), df2("ts")) && df1("id") === df2("id"))
+val pitJoin = df1.join(df2, pit(df1("ts"), df2("ts"), lit(0)) && df1("id") === df2("id"))
+```
+
+#### Adding tolerance
+
+The UDF takes a third argument (required) for tolerance, when this argument is set to a non-null value, the PIT join does not return matches where the timestamp differ by a specific value. E.g. setting the third argument to `lit(3)` would only accept PIT matches that differ by at most 3 time units.
+
+#### Left outer join
+
+The default join type for PIT joins are inner joins, but if you'd like to keep all of the values from the left table in the resulting table you may use a left outer join.
+
+Usage:
+
+```scala
+val pitJoin = df1.join(
+  df2, pit(df1("ts"), df2("ts"), lit(0)) && df1("id") === df2("id"),
+  "left"
+)
 ```
 
 ### Union merge

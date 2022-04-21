@@ -32,6 +32,26 @@ There are currently 3 ways of executing a PIT join, using an early stop sort mer
 pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts) & (df1.id == df2.id))
 ```
 
+##### 2.1.2. Adding tolerance
+
+In this implementation, tolerance can be added to not allow matches whose timestamp differ by at most some value. To utilize this, set the third argument of the UDF to the desired integer value of the maximum different between two timestamps.
+
+```py
+pit_join = df1.join(df2,  pit_context.pit_udf(df1.ts, df2.ts, 100) & (df1.id == df2.id))
+```
+
+##### 2.1.3. Left outer join
+
+Left outer joins are supported in this implementation, the main difference between a regular inner join and a left outer join is that whether or not a left row gets matched with a right row, it will still be a part of the resulting table. In the resulting table, all the left rows that did not find a match have the values of the right columns set to `null`.
+
+```py
+pit_join = df1.join(
+    df2,
+    pit_context.pit_udf(df1.ts, df2.ts, 100) & (df1.id == df2.id),
+    "left"
+)
+```
+
 #### 2.2. Union merge
 
 ```py
@@ -56,4 +76,20 @@ pit_join = pit_context.exploding(
     right_ts_column=df2["ts"],
     partition_cols = [df1["id"], df2["id"]],
 )
+```
+
+## Development
+
+### Testing
+
+To run the tests for this package, you must first package the Scala package to a JAR file and export its path as an environment variable:
+
+```bash
+export SCALA_PIT_JAR=<PATH_TO_JAR_FILE>
+```
+
+To run all the tests, run the following command in the Python directory:
+
+```bash
+python -m unittest discover -s tests
 ```
