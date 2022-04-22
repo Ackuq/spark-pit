@@ -32,7 +32,11 @@ import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.{Column, SparkSession}
 
 object EarlyStopSortMerge {
-  private final val PIT_FUNCTION = (_: Column, _: Column) => true
+  private final val PIT_FUNCTION = (
+      _: Column,
+      _: Column,
+      _: Long
+  ) => true
   final val PIT_UDF_NAME = "PIT"
   final val pit: UserDefinedFunction = udf(PIT_FUNCTION).withName(PIT_UDF_NAME)
 

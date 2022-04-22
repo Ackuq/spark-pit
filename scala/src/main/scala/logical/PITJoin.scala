@@ -46,6 +46,8 @@ protected[pit] case class PITJoin(
     left: LogicalPlan,
     right: LogicalPlan,
     pitCondition: Expression,
+    returnNulls: Boolean,
+    tolerance: Long,
     condition: Option[Expression]
 ) extends BinaryNode
     with PredicateHelper {
@@ -66,7 +68,11 @@ protected[pit] case class PITJoin(
   }
 
   override def output: Seq[Attribute] = {
-    left.output ++ right.output
+    if (returnNulls) {
+      left.output ++ right.output.map(_.withNullability(true))
+    } else {
+      left.output ++ right.output
+    }
   }
 
   override def metadataOutput: Seq[Attribute] = {

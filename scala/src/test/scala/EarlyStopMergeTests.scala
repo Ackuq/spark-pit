@@ -27,6 +27,7 @@ package io.github.ackuq.pit
 import EarlyStopSortMerge.pit
 import data.SmallDataSortMerge
 
+import org.apache.spark.sql.functions.lit
 import org.scalatest.flatspec.AnyFlatSpec
 
 class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
@@ -38,7 +39,10 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     val fg2 = smallData.fg2
 
     val pitJoin =
-      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id")
+      )
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
@@ -52,7 +56,10 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     val fg2 = smallData.fg3
 
     val pitJoin =
-      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id")
+      )
 
     assert(!pitJoin.isEmpty)
     // Assert same schema
@@ -67,12 +74,15 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     val fg3 = smallData.fg3
 
     val left =
-      fg1.join(fg2, pit(fg1("ts"), fg2("ts")) && fg1("id") === fg2("id"))
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id")
+      )
 
     val pitJoin =
       left.join(
         fg3,
-        pit(fg1("ts"), fg3("ts")) && fg1("id") === fg3("id")
+        pit(fg1("ts"), fg3("ts"), lit(0)) && fg1("id") === fg3("id")
       )
 
     assert(!pitJoin.isEmpty)
@@ -80,5 +90,36 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     assert(pitJoin.schema.equals(smallData.PIT_1_2_3.schema))
     // Assert same elements
     assert(pitJoin.collect().sameElements(smallData.PIT_1_2_3.collect()))
+  }
+
+  it should "Be able to perform a PIT join with tolerance, misaligned timestamps" in {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.fg3
+
+    val pitJoin = fg1.join(
+      fg2,
+      pit(fg1("ts"), fg2("ts"), lit(1)) && fg1("id") === fg2("id")
+    )
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    assert(pitJoin.schema.equals(smallData.PIT_1_3_T1.schema))
+    // Assert same elements
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_3_T1.collect()))
+  }
+
+  it should "Be able to perform a left outer PIT join with tolerance, misaligned timestamps" in {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.fg3
+
+    val pitJoin = fg1.join(
+      fg2,
+      pit(fg1("ts"), fg2("ts"), lit(1)) && fg1("id") === fg2("id"),
+      "left"
+    )
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    assert(pitJoin.schema.equals(smallData.PIT_1_3_T1_OUTER.schema))
+    // Assert same elements
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_3_T1_OUTER.collect()))
   }
 }

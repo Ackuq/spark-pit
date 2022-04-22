@@ -32,7 +32,7 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.joins.ShuffledJoin
-import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 
 /** Performs a PIT join of two child relations.
   */
@@ -44,11 +44,13 @@ protected[pit] case class PITJoinExec(
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
+    returnNulls: Boolean,
+    tolerance: Long,
     isSkewJoin: Boolean = false
 ) extends ShuffledJoin
     with CodegenSupport {
 
-  override lazy val metrics = Map(
+  override lazy val metrics: Map[String, SQLMetric] = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
       sparkContext,
       "number of output rows"
@@ -66,7 +68,6 @@ protected[pit] case class PITJoinExec(
     if (isSkewJoin) {
       UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
     } else {
-      // We only want to partition of left keys, so cluster them only
       HashClusteredDistribution(leftEquiKeys) :: HashClusteredDistribution(
         rightEquiKeys
       ) :: Nil
@@ -184,29 +185,41 @@ protected[pit] case class PITJoinExec(
               equiKeyOrdering,
               RowIterator.fromScala(leftIter),
               RowIterator.fromScala(rightIter),
-              cleanupResources
+              cleanupResources,
+              returnNulls,
+              tolerance
             )
-            private[this] val joinRow = new JoinedRow
+
+            private[this] val joinRow = new JoinedRow()
+            private[this] val nullRightRow =
+              new GenericInternalRow(right.output.length)
 
             override def advanceNext(): Boolean = {
               while (smjScanner.findNextInnerJoinRows()) {
                 currentRightMatch = smjScanner.getBufferedMatch
                 currentLeftRow = smjScanner.getStreamedRow
-
-                joinRow(currentLeftRow, currentRightMatch)
-                if (boundCondition(joinRow)) {
+                if (returnNulls && currentRightMatch == null) {
+                  joinRow(currentLeftRow, nullRightRow)
+                  joinRow.withRight(nullRightRow)
                   numOutputRows += 1
                   return true
+                } else {
+                  joinRow(currentLeftRow, currentRightMatch)
+                  if (boundCondition(joinRow)) {
+                    numOutputRows += 1
+                    return true
+                  }
                 }
               }
 
               currentRightMatch = null
               currentLeftRow = null
               false
-
             }
 
-            override def getRow: InternalRow = resultProj(joinRow)
+            override def getRow: InternalRow = {
+              resultProj(joinRow)
+            }
           }.toScala
 
         case x =>
@@ -221,7 +234,11 @@ protected[pit] case class PITJoinExec(
   override def output: Seq[Attribute] = {
     customJoinType match {
       case PITJoinType =>
-        left.output ++ right.output
+        if (returnNulls) {
+          left.output ++ right.output.map(_.withNullability(true))
+        } else {
+          left.output ++ right.output
+        }
       case x =>
         throw new IllegalArgumentException(
           s"${getClass.getSimpleName} not take $x as the JoinType"
@@ -275,6 +292,19 @@ protected[pit] case class PITJoinExec(
     )
   }
 
+  private def genToleranceConditions(
+      leftPIT: Seq[ExprCode],
+      rightPIT: Seq[ExprCode]
+  ): String = {
+    val toleranceCheck =
+      leftPIT.zip(rightPIT).zipWithIndex.map { case ((l, r), i) =>
+        s"""
+           | (${l.value} - ${r.value} > ${tolerance})
+           |""".stripMargin
+      }
+    toleranceCheck.mkString(" && ")
+  }
+
   private def genComparision(
       ctx: CodegenContext,
       a_PIT: Seq[ExprCode],
@@ -282,32 +312,35 @@ protected[pit] case class PITJoinExec(
       b_PIT: Seq[ExprCode],
       b_EQUI: Seq[ExprCode]
   ): String = {
-    val comparisons =
-      (
-        a_PIT.zip(a_EQUI).zipWithIndex,
-        b_PIT.zip(b_EQUI).zipWithIndex
-      ).zipped.map { case (((l_PIT, l_EQUI), i), ((r_PIT, r_EQUI), _)) =>
+    val pitComparisons =
+      a_PIT.zip(b_PIT).zipWithIndex.map { case ((l, r), i) =>
+        s"""
+           |if (pitComp >= 0) {
+           |  pitComp = ${ctx.genComp(
+            leftPitKeys(i).dataType,
+            l.value,
+            r.value
+          )};
+           |}
+           """.stripMargin
+      }
+    val equiComparisons =
+      a_EQUI.zip(b_EQUI).zipWithIndex.map { case ((l, r), i) =>
         s"""
            |if (equiComp == 0) {
            |  equiComp = ${ctx.genComp(
-            leftKeys(i).dataType,
-            l_EQUI.value,
-            r_EQUI.value
+            leftEquiKeys(i).dataType,
+            l.value,
+            r.value
           )};
            |}
-           |if (pitComp >= 0) {
-           |  pitComp = ${ctx.genComp(
-            leftKeys(i).dataType,
-            l_PIT.value,
-            r_PIT.value
-          )};
-           |}
-       """.stripMargin.trim
+           """
       }
     s"""
        |equiComp = 0;
        |pitComp = 0;
-       |${comparisons.mkString("\n")}
+       |${pitComparisons.mkString("\n")}
+       |${equiComparisons.mkString("\n")}
      """.stripMargin
   }
 
@@ -367,7 +400,31 @@ protected[pit] case class PITJoinExec(
   ): Seq[ExprCode] = {
     ctx.INPUT_ROW = rightRow
     right.output.zipWithIndex.map { case (a, i) =>
-      BoundReference(i, a.dataType, a.nullable).genCode(ctx)
+      val ev = BoundReference(i, a.dataType, a.nullable).genCode(ctx);
+      if (returnNulls) {
+        val isNull = ctx.freshName("isNull")
+        val value = ctx.freshName("value")
+        val javaType = CodeGenerator.javaType(a.dataType)
+        val code =
+          code"""
+                |boolean $isNull = true;
+                |$javaType $value = ${CodeGenerator.defaultValue(
+                 a.dataType
+               )};
+                |if ($rightRow != null) {
+                |  ${ev.code}
+                |  $isNull = ${ev.isNull};
+                |  $value = ${ev.value};
+                |}
+          """.stripMargin
+        ExprCode(
+          code,
+          JavaCode.isNullVariable(isNull),
+          JavaCode.variable(value, a.dataType)
+        )
+      } else {
+        ev
+      }
     }
   }
 
@@ -450,9 +507,22 @@ protected[pit] case class PITJoinExec(
           rightEquiKeyVars
         )}
          |      if (equiComp > 0) {
+         |        if($returnNulls) {
+         |          $matched = null;
+         |          return false;
+         |        }
          |        $leftRow = null;
          |      } else if (equiComp < 0 || pitComp < 0) {
          |        $rightRow = null;
+         |      } else if ($tolerance > 0 && ${genToleranceConditions(
+          leftPITKeyVars,
+          rightPITKeyVars
+        )}) {     
+         |        if($returnNulls) {
+         |          $matched = null;
+         |          return false;
+         |        }
+         |        $leftRow = null;
          |      } else {
          |        $matched = (UnsafeRow) $rightRow;
          |        ${matchedPITKeyVars.map(_.code).mkString("\n")}
@@ -556,19 +626,33 @@ protected[pit] case class PITJoinExec(
 
     val thisPlan = ctx.addReferenceObj("plan", this)
     val eagerCleanup = s"$thisPlan.cleanupResources();"
-
-    s"""
-       |while (findNextInnerJoinRows($leftInput, $rightInput)) {
-       |  ${leftVarDecl.mkString("\n")}
-       |  ${beforeLoop.trim}
-       |  InternalRow $rightRow = (InternalRow) $matched;
-       |  ${condCheck.trim}
-       |  $numOutput.add(1);
-       |  ${consume(ctx, leftVars ++ rightVars)}
-       |  if (shouldStop()) return;
-       |}
-       |$eagerCleanup
-     """.stripMargin
+    returnNulls match {
+      case false => s"""
+                       |while (findNextInnerJoinRows($leftInput, $rightInput)) {
+                       |  ${leftVarDecl.mkString("\n")}
+                       |  ${beforeLoop.trim}
+                       |  InternalRow $rightRow = (InternalRow) $matched;
+                       |  ${condCheck.trim}
+                       |  $numOutput.add(1);
+                       |  ${consume(ctx, leftVars ++ rightVars)}
+                       |  if (shouldStop()) return;
+                       |}
+                       |$eagerCleanup
+                       |""".stripMargin
+      case true =>
+        s"""
+           |while($leftInput.hasNext()) {
+           |  findNextInnerJoinRows($leftInput, $rightInput);
+           |  ${leftVarDecl.mkString("\n")}
+           |  ${beforeLoop.trim}
+           |  InternalRow $rightRow = (InternalRow) $matched;
+           |  ${condCheck.trim}
+           |  $numOutput.add(1);
+           |  ${consume(ctx, leftVars ++ rightVars)};
+           |  if (shouldStop()) return;
+           |}
+           |""".stripMargin
+    }
   }
 }
 
@@ -600,6 +684,12 @@ protected[pit] case class PITJoinExec(
   *   have the same join key.
   * @param eagerCleanupResources
   *   the eager cleanup function to be invoked when no join row found
+  * @param returnNulls
+  *   event if no PIT match found, return the left row with right columns filled
+  *   with null
+  * @param tolerance
+  *   tolerance for how long we want to look back, if value is 0, do no use
+  *   tolerance
   */
 protected[pit] class PITJoinScanner(
     streamedPITKeyGenerator: Projection,
@@ -610,7 +700,9 @@ protected[pit] class PITJoinScanner(
     equiKeyOrdering: Ordering[InternalRow],
     streamedIter: RowIterator,
     bufferedIter: RowIterator,
-    eagerCleanupResources: () => Unit
+    eagerCleanupResources: () => Unit,
+    returnNulls: Boolean = false,
+    tolerance: Long = 0
 ) {
   private[this] var streamedRow: InternalRow = _
   private[this] var streamedRowEquiKey: InternalRow = _
@@ -654,7 +746,6 @@ protected[pit] class PITJoinScanner(
       // Advance the streamed side of the join until we find the next row whose join key contains
       // no nulls or we hit the end of the streamed iterator.
     }
-
     val found = if (streamedRow == null) {
       // We have consumed the entire streamed iterator, so there can be no more matches.
       matchJoinEquiKey = null
@@ -696,12 +787,21 @@ protected[pit] class PITJoinScanner(
             equiKeyOrdering.compare(streamedRowEquiKey, bufferedRowEquiKey)
           pitComp = pitKeyOrdering.compare(streamedRowPITKey, bufferedRowPITKey)
 
-          if (equiComp < 0) advancedStreamed()
-          else if (equiComp > 0) advancedBuffered()
+          if (equiComp < 0) {
+            if (returnNulls) {
+              bufferedMatch = null
+              return true
+            }
+            advancedStreamed()
+          } else if (equiComp > 0) advancedBuffered()
           else if (pitComp > 0) advancedBuffered()
         }
       } while (streamedRow != null && bufferedRow != null && (equiComp != 0 || pitComp > 0))
-      if (streamedRow == null || bufferedRow == null) {
+      if (returnNulls && streamedRow != null && bufferedRow == null) {
+        // Not a match found for the streamed row
+        bufferedMatch = null
+        true
+      } else if (streamedRow == null || bufferedRow == null) {
         // We have either hit the end of one of the iterators, so there can be no more matches.
         matchJoinEquiKey = null
         matchJoinPITKey = null
@@ -710,6 +810,16 @@ protected[pit] class PITJoinScanner(
       } else {
         // The streamed row's join key matches the current buffered row's join, only take this row
         assert(equiComp == 0 && pitComp <= 0)
+
+        if (tolerance > 0) {
+          val streamedTS = streamedRowPITKey.getLong(0)
+          val bufferedTS = bufferedRowPITKey.getLong(0)
+          if (streamedTS - bufferedTS > tolerance) {
+            // The one closest to the streamed row exceeds the tolerance, continue...
+            bufferedMatch = null
+            return true
+          }
+        }
 
         bufferedMatch = bufferedRow.asInstanceOf[UnsafeRow]
         true

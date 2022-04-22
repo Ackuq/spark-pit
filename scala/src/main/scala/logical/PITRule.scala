@@ -34,33 +34,59 @@ import org.apache.spark.sql.catalyst.expressions.{
   PredicateHelper,
   ScalaUDF
 }
+import org.apache.spark.sql.catalyst.plans.{Inner, LeftOuter}
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 
 protected[pit] object PITRule extends Rule[LogicalPlan] with PredicateHelper {
   def apply(logicalPlan: LogicalPlan): LogicalPlan =
-    logicalPlan.transform { case j @ Join(left, right, _, condition, _) =>
-      val predicates = {
-        condition.map(splitConjunctivePredicates).getOrElse(Nil)
-      }
-
-      val pitExpressions = getPITExpression(predicates)
-      if (pitExpressions.nonEmpty && pitExpressions.length == 1) {
-        val pitExpression: ScalaUDF = pitExpressions.head
-        val otherPredicates = predicates.filterNot {
-          case f: ScalaUDF if f.udfName.getOrElse("") == PIT_UDF_NAME => true
-          case _                                                      => false
+    logicalPlan.transform {
+      case j @ Join(left, right, joinType, condition, _) =>
+        val predicates = {
+          condition.map(splitConjunctivePredicates).getOrElse(Nil)
         }
-        val pitCondition =
-          GreaterThanOrEqual(
-            pitExpression.children.head,
-            pitExpression.children(1)
-          )
 
-        PITJoin(left, right, pitCondition, otherPredicates.reduceOption(And))
-      } else {
-        j
-      }
+        val pitExpressions = getPITExpression(predicates)
+        if (pitExpressions.nonEmpty && pitExpressions.length == 1) {
+          joinType match {
+            case LeftOuter | Inner => ()
+            case x =>
+              throw new IllegalArgumentException(
+                s"Join type $x not supported for PIT joins"
+              )
+          }
+
+          val pitExpression: ScalaUDF = pitExpressions.head
+          val otherPredicates = predicates.filterNot {
+            case f: ScalaUDF if f.udfName.getOrElse("") == PIT_UDF_NAME => true
+            case _                                                      => false
+          }
+          val pitCondition =
+            GreaterThanOrEqual(
+              pitExpression.children.head,
+              pitExpression.children(1)
+            )
+
+          val tolerance =
+            pitExpression
+              .children(2)
+              .eval()
+              .asInstanceOf[Long]
+
+          // When join type is left outer, return nulls as well
+          val returnNulls = joinType == LeftOuter
+
+          PITJoin(
+            left,
+            right,
+            pitCondition,
+            returnNulls,
+            tolerance,
+            otherPredicates.reduceOption(And)
+          )
+        } else {
+          j
+        }
     }
 
   private def getPITExpression(predicates: Seq[Expression]) = {

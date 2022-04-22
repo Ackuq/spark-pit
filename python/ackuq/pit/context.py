@@ -27,6 +27,7 @@ from typing import Any, List, Optional, Tuple
 from py4j.java_gateway import JavaPackage
 from pyspark.sql import Column, DataFrame, SQLContext
 from pyspark.sql.column import _to_java_column, _to_seq  # type: ignore
+from pyspark.sql.functions import lit
 
 
 class PitContext(object):
@@ -100,13 +101,24 @@ class PitContext(object):
     def _to_scala_option(self, x: Optional[Any]):
         return self._jvm.scala.Some(x) if x is not None else self._scala_none()
 
-    def pit_udf(self, left: Column, right: Column):
+    def pit_udf(self, left: Column, right: Column, tolerance: int = 0):
         """
         Used for executing an early stop sort merge join by using custom UDF.
 
+        :param left         The timestamp column of left table
+        :param right        The timestamp column of right table
+        :param tolerance    Optional, The tolerance of the PIT result
         """
         _pit_udf = self._essm.getPit()
-        return Column(_pit_udf.apply(_to_seq(self._sc, [left, right], _to_java_column)))
+        return Column(
+            _pit_udf.apply(
+                _to_seq(
+                    self._sc,
+                    [left, right, lit(tolerance)],
+                    _to_java_column,
+                )
+            )
+        )
 
     def union(
         self,
@@ -154,11 +166,11 @@ class PitContext(object):
         """
         Perform a backward asof join using the left table for event times.
 
-        :param left          The left dataframe, will be used as reference
-        :param right         The right dataframe, will be used to merge
-        :param left_ts_column  The column used for timestamps in left DF
-        :param right_ts_column The column used for timestamps in right DF
-        :param partition_cols The columns used for partitioning, if used
+        :param left             The left dataframe, will be used as reference
+        :param right            The right dataframe, will be used to merge
+        :param left_ts_column   The column used for timestamps in left DF
+        :param right_ts_column  The column used for timestamps in right DF
+        :param partition_cols   The columns used for partitioning, if used
         """
         _partition_cols = map(
             lambda p: self._to_scala_tuple((p[0]._jc, p[1]._jc)), partition_cols

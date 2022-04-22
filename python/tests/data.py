@@ -81,6 +81,17 @@ class SmallDataSortMerge(SmallData):
         [1, 5, "1x", 1, 1, "f3-1-1"],
         [1, 4, "1z", 1, 1, "f3-1-1"],
     ]
+    PIT_1_3_T1_RAW = [
+        [2, 8, "2y", 2, 8, "f3-2-8"],
+        [1, 7, "1y", 1, 6, "f3-1-6"],
+    ]
+    PIT_1_3_T1_OUTER_RAW = [
+        [2, 8, "2y", 2, 8, "f3-2-8"],
+        [2, 6, "2x", None, None, None],
+        [1, 7, "1y", 1, 6, "f3-1-6"],
+        [1, 5, "1x", None, None, None],
+        [1, 4, "1z", None, None, None],
+    ]
     PIT_1_2_3_RAW = [
         [2, 8, "2y", 2, 8, "2y", 2, 8, "f3-2-8"],
         [2, 6, "2x", 2, 6, "2x", 2, 2, "f3-2-2"],
@@ -97,6 +108,16 @@ class SmallDataSortMerge(SmallData):
             StructField("id", IntegerType(), nullable=False),
             StructField("ts", IntegerType(), nullable=False),
             StructField("value", StringType(), nullable=False),
+        ]
+    )
+    PIT_2_OUTER_schema: StructType = StructType(
+        [
+            StructField("id", IntegerType(), nullable=False),
+            StructField("ts", IntegerType(), nullable=False),
+            StructField("value", StringType(), nullable=False),
+            StructField("id", IntegerType(), nullable=True),
+            StructField("ts", IntegerType(), nullable=True),
+            StructField("value", StringType(), nullable=True),
         ]
     )
     PIT_3_schema: StructType = StructType(
@@ -120,6 +141,13 @@ class SmallDataSortMerge(SmallData):
         )
         self.PIT_1_3 = spark.createDataFrame(
             spark.sparkContext.parallelize(self.PIT_1_3_RAW), self.PIT_2_schema
+        )
+        self.PIT_1_3_T1 = spark.createDataFrame(
+            spark.sparkContext.parallelize(self.PIT_1_3_T1_RAW), self.PIT_2_schema
+        )
+        self.PIT_1_3_T1_OUTER = spark.createDataFrame(
+            spark.sparkContext.parallelize(self.PIT_1_3_T1_OUTER_RAW),
+            self.PIT_2_OUTER_schema,
         )
         self.PIT_1_2_3 = spark.createDataFrame(
             spark.sparkContext.parallelize(self.PIT_1_2_3_RAW), self.PIT_3_schema

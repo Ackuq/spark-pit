@@ -92,6 +92,8 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
       Seq[Expression],
       Seq[Expression],
       Option[Expression],
+      Boolean,
+      Long,
       LogicalPlan,
       LogicalPlan
   )
@@ -134,6 +136,8 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
         leftEquiKeys,
         rightEquiKeys,
         otherPredicates.reduceOption(And),
+        join.returnNulls,
+        join.tolerance,
         join.left,
         join.right
       )
