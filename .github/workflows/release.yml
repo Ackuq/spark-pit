@@ -63,9 +63,12 @@ jobs:
           git push
 
       - name: Create tag
-        uses: actions-ecosystem/action-push-tag@v1
-        with:
-          tag: v${{ steps.version.outputs.jar_version }}
+        run: |
+            tag=v${{ steps.bump-semver.outputs.new_version }}
+            git config user.name "${GITHUB_ACTOR}"
+            git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+            git tag -a "${tag}" -m "Release version ${{ steps.bump-semver.outputs.new_version }}"
+            git push origin "${tag}"
       
       - name: Release
         uses: softprops/action-gh-release@v1
