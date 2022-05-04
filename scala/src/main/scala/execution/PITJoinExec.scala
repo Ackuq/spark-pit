@@ -45,8 +45,7 @@ protected[pit] case class PITJoinExec(
     left: SparkPlan,
     right: SparkPlan,
     returnNulls: Boolean,
-    tolerance: Long,
-    isSkewJoin: Boolean = false
+    tolerance: Long
 ) extends ShuffledJoin
     with CodegenSupport {
 
@@ -58,14 +57,14 @@ protected[pit] case class PITJoinExec(
   )
 
   override def nodeName: String = {
-    if (isSkewJoin) super.nodeName + "(skew=true)" else super.nodeName
+    super.nodeName
   }
 
   override def stringArgs: Iterator[Any] =
     super.stringArgs.toSeq.dropRight(1).iterator
 
   override def requiredChildDistribution: Seq[Distribution] = {
-    if (isSkewJoin) {
+    if (leftEquiKeys.isEmpty || rightEquiKeys.isEmpty) {
       UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
     } else {
       HashClusteredDistribution(leftEquiKeys) :: HashClusteredDistribution(
@@ -443,18 +442,16 @@ protected[pit] case class PITJoinExec(
     // Create variables fro join keys
     val (leftPITKeyVars, leftEquiKeyVars) =
       createJoinKeys(ctx, leftRow, leftPitKeys, leftEquiKeys, left.output)
-    val (leftPITAnyNull, leftEquiAnyNull) = (
-      leftPITKeyVars.map(_.isNull).mkString(" || "),
-      leftEquiKeyVars.map(_.isNull).mkString(" || ")
-    )
+    val leftAnyNull =
+      (leftPITKeyVars.map(_.isNull) ++ leftEquiKeyVars.map(_.isNull))
+        .mkString(" || ")
 
     val (rightPITKeyTmpVars, rightEquiKeyTmpVars) =
       createJoinKeys(ctx, rightRow, rightPitKeys, rightEquiKeys, right.output)
+    val rightAnyNull =
+      (rightPITKeyTmpVars.map(_.isNull) ++ rightEquiKeyTmpVars.map(_.isNull))
+        .mkString(" || ")
 
-    val (rightPITAnyNull, rightEquiAnyNull) = (
-      rightPITKeyTmpVars.map(_.isNull).mkString(" || "),
-      rightEquiKeyTmpVars.map(_.isNull).mkString(" || ")
-    )
     // Copy the right key as class members so they could be used in next function call.
     val rightPITKeyVars = copyKeys(ctx, rightPITKeyTmpVars)
     val rightEquiKeyVars = copyKeys(ctx, rightEquiKeyTmpVars)
@@ -480,7 +477,7 @@ protected[pit] case class PITJoinExec(
          |    $leftRow = (InternalRow) leftIter.next();
          |    ${leftPITKeyVars.map(_.code).mkString("\n")}
          |    ${leftEquiKeyVars.map(_.code).mkString("\n")}
-         |    if($leftPITAnyNull|| $leftEquiAnyNull) {
+         |    if($leftAnyNull) {
          |      $leftRow = null;
          |      continue;
          |    }
@@ -492,7 +489,7 @@ protected[pit] case class PITJoinExec(
          |        $rightRow = (InternalRow) rightIter.next();
          |        ${rightPITKeyTmpVars.map(_.code).mkString("\n")}
          |        ${rightEquiKeyTmpVars.map(_.code).mkString("\n")}
-         |        if ($rightPITAnyNull|| $rightEquiAnyNull) {
+         |        if ($rightAnyNull) {
          |          $rightRow = null;
          |          continue;
          |        }

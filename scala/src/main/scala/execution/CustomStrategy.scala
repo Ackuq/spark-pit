@@ -50,9 +50,10 @@ protected[pit] object CustomStrategy
         ) =>
       if (
         // TODO: Add ability for non-equi conditions
-        leftEquiKeys.nonEmpty && RowOrdering.isOrderable(
-          leftEquiKeys
-        ) && RowOrdering.isOrderable(Seq(leftPitKey))
+        nonEquiCond.isEmpty && (leftEquiKeys.isEmpty || RowOrdering
+          .isOrderable(
+            leftEquiKeys
+          )) && RowOrdering.isOrderable(Seq(leftPitKey))
       ) {
         Seq(
           PITJoinExec(
