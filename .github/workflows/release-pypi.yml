@@ -35,7 +35,7 @@ jobs:
       - name: Get the new version number
         id: version
         run: |
-          echo "::set-output name=pypi_version::$(cat scala/VERSION)"
+          echo "::set-output name=pypi_version::$(cat python/VERSION)"
 
       - name: Push updated version file
         run: |
