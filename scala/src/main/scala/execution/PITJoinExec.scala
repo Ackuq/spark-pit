@@ -72,7 +72,8 @@ protected[pit] case class PITJoinExec(
 
   override def requiredChildDistribution: Seq[Distribution] = {
     if (leftEquiKeys.isEmpty || rightEquiKeys.isEmpty) {
-      UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
+      // TODO: This should be improved, but for now just keep everything in one partition
+      AllTuples :: AllTuples :: Nil
     } else {
       HashClusteredDistribution(leftEquiKeys) :: HashClusteredDistribution(
         rightEquiKeys
