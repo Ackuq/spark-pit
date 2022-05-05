@@ -25,7 +25,7 @@ Apart from utilising existing high-level implementations, a couple of implementa
 
 | Dependency      | Version |
 | --------------- | ------- |
-| Spark & PySpark | 3.1     |
+| Spark & PySpark | 3.2     |
 | Scala           | 2.12    |
 | Python          | >=3.6   |
 

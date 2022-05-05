@@ -82,4 +82,8 @@ protected[pit] case class PITJoin(
   def duplicateResolved: Boolean =
     left.outputSet.intersect(right.outputSet).isEmpty
 
+  override protected def withNewChildrenInternal(
+      newLeft: LogicalPlan,
+      newRight: LogicalPlan
+  ): PITJoin = copy(left = newLeft, right = newRight)
 }
