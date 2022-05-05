@@ -49,6 +49,13 @@ protected[pit] case class PITJoinExec(
 ) extends ShuffledJoin
     with CodegenSupport {
 
+  override def isSkewJoin: Boolean = false
+
+  override protected def withNewChildrenInternal(
+      newLeft: SparkPlan,
+      newRight: SparkPlan
+  ): PITJoinExec = copy(left = newLeft, right = newRight)
+
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "numOutputRows" -> SQLMetrics.createMetric(
       sparkContext,
