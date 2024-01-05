@@ -31,6 +31,7 @@ import org.apache.spark.sql.functions.lit
 import org.scalatest.flatspec.AnyFlatSpec
 
 class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
+  spark.sparkContext.setLogLevel("ERROR")
   EarlyStopSortMerge.init(spark)
   val smallData = new SmallDataSortMerge(spark)
 
@@ -159,6 +160,26 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     assert(pitJoin.schema.equals(smallData.PIT_1_3_T1.schema))
     // Assert same elements
     assert(pitJoin.collect().sameElements(smallData.PIT_1_3_T1.collect()))
+  }
+
+  it should "Be able to perform a left outer PIT join without tolerance, misaligned timestamps" in {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.fg3
+
+    fg1.show()
+    fg2.show()
+
+    val pitJoin = fg1.join(
+      fg2,
+      pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id"),
+      "left"
+    )
+    pitJoin.show()
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    assert(pitJoin.schema.equals(smallData.PIT_1_3_T1_OUTER.schema))
+    // Assert same elements
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_3_T1_OUTER.collect()))
   }
 
   it should "Be able to perform a left outer PIT join with tolerance, misaligned timestamps" in {
