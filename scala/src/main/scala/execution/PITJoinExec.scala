@@ -493,6 +493,7 @@ protected[pit] case class PITJoinExec(
          |    do {
          |      if($rightRow == null) {
          |        if(!rightIter.hasNext()) {
+         |          $matched = null;
          |          return false;
          |        }
          |        $rightRow = (InternalRow) rightIter.next();
