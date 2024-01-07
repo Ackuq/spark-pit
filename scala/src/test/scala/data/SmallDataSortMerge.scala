@@ -88,6 +88,20 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     )
   )
 
+  private val PIT_2_3_OUTER_schema: StructType = StructType(
+    Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("ts", IntegerType, nullable = false),
+      StructField("value", StringType, nullable = false),
+      StructField("id", IntegerType, nullable = true),
+      StructField("ts", IntegerType, nullable = true),
+      StructField("value", StringType, nullable = true),
+      StructField("id", IntegerType, nullable = true),
+      StructField("ts", IntegerType, nullable = true),
+      StructField("value", StringType, nullable = true)
+    )
+  )
+
   private val PIT_3_schema: StructType = StructType(
     Seq(
       StructField("id", IntegerType, nullable = false),
@@ -119,6 +133,11 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     spark.sparkContext.parallelize(PIT_1_3_T1_OUTER_RAW),
     PIT_2_OUTER_schema
   )
+
+  // val PIT_1_3_T1_OUTER: DataFrame = spark.createDataFrame(
+  //   spark.sparkContext.parallelize(PIT_1_3_T1_OUTER_RAW),
+  //   PIT_2_OUTER_schema
+  // )
 
   val PIT_1_2_3: DataFrame = spark.createDataFrame(
     spark.sparkContext.parallelize(PIT_1_2_3_RAW),

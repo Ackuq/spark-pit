@@ -68,6 +68,30 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     assert(pitJoin.collect().sameElements(smallData.PIT_1_3.collect()))
   }
 
+  it should "Perform a PIT join between empty dataframe and wide dataframe" in {
+    val fg1 = smallData.wide
+    val fg2 = smallData.empty
+
+    val pitJoin =
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id"),
+        "left"
+      )
+
+    // pitJoin.show()
+    // pitJoin.explain(true)
+    // pitJoin.explain(mode="codegen")
+
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    // assert(pitJoin.schema.equals(smallData.PIT_1_3.schema))
+    // Assert same elements
+    assert(pitJoin.collect().length === 1)
+
+    Nil
+  }
+
   it should "Perform a PIT join with three dataframes, misaligned timestamps" in {
     val fg1 = smallData.fg1
     val fg2 = smallData.fg2
@@ -90,6 +114,36 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     assert(pitJoin.schema.equals(smallData.PIT_1_2_3.schema))
     // Assert same elements
     assert(pitJoin.collect().sameElements(smallData.PIT_1_2_3.collect()))
+  }
+
+  it should "Perform a PIT left join with three dataframes including an empty dataframe" in {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.empty
+    val fg3 = smallData.fg3
+
+    val left =
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id"),
+        "left"
+      )
+
+    val pitJoin =
+      left.join(
+        fg3,
+        pit(fg1("ts"), fg3("ts"), lit(0)) && fg1("id") === fg3("id"),
+        "left",
+      )
+
+
+    pitJoin.show()
+
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    // assert(pitJoin.schema.equals(smallData.PIT_2_3_OUTER_schema.schema))
+    // Assert same elements
+    assert (pitJoin.count() == fg1.count())
+    // assert(pitJoin.collect().sameElements(smallData.PIT_1_2_3.collect()))
   }
 
   it should "Be able to perform a PIT join with tolerance, misaligned timestamps" in {

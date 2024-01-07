@@ -64,6 +64,17 @@ class SmallData(spark: SparkSession) {
       StructField("value", StringType, nullable = false)
     )
   )
+  // 96 fails 95 works
+  private val value_columns_on_wide: Integer = 96
+
+  private val wide_schema: StructType = StructType(
+    Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("ts", IntegerType, nullable = false)
+    ) ++ (1 to value_columns_on_wide).map(i =>
+      StructField(s"$i", StringType, nullable = true)
+    )
+  )
 
   val fg1: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW.head), schema)
@@ -71,4 +82,13 @@ class SmallData(spark: SparkSession) {
     spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(1)), schema)
   val fg3: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(2)), schema)
+
+  val empty: DataFrame =
+    spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+  val wide: DataFrame = spark.createDataFrame(
+    spark.sparkContext.parallelize(
+      Seq(Row.fromSeq(Seq(1, 4) ++ (1 to value_columns_on_wide).map(x => null)))
+    ),
+    wide_schema
+  )
 }
