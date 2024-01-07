@@ -777,7 +777,10 @@ protected[pit] class PITJoinScanner(
       matchJoinEquiKey = null
       matchJoinPITKey = null
       bufferedMatch = null
-      false
+      // If returnNulls then we can exit early without searching through the remainder of the 
+      // streamed row. If returnNulls then it doesn't matter that there are no more candidate rows
+      // to match with - we still need to return the streamed row so they can be matched with nulls. 
+      returnNulls
     } else {
       // Advance both the streamed and buffered iterators to find the next pair of matching rows.
       var equiComp =
