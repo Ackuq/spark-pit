@@ -49,6 +49,13 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
     Row(1, 5, "1x", 1, 1, "f3-1-1"),
     Row(1, 4, "1z", 1, 1, "f3-1-1")
   )
+  private val PIT_3_1_OUTER_RAW = Seq(
+    Row(2, 8, "f3-2-8", 2, 8, "2y"),
+    Row(2, 2, "f3-2-2", null, null, null),
+    Row(1, 10, "f3-1-10", 1, 7, "1y"),
+    Row(1, 6, "f3-1-6", 1, 5, "1x"),
+    Row(1, 1, "f3-1-1", null, null, null)
+  )
   private val PIT_1_3_T1_RAW = Seq(
     Row(2, 8, "2y", 2, 8, "f3-2-8"),
     Row(1, 7, "1y", 1, 6, "f3-1-6")
@@ -131,6 +138,11 @@ class SmallDataSortMerge(spark: SparkSession) extends SmallData(spark) {
 
   val PIT_1_3_T1_OUTER: DataFrame = spark.createDataFrame(
     spark.sparkContext.parallelize(PIT_1_3_T1_OUTER_RAW),
+    PIT_2_OUTER_schema
+  )
+
+  val PIT_3_1_OUTER: DataFrame = spark.createDataFrame(
+    spark.sparkContext.parallelize(PIT_3_1_OUTER_RAW),
     PIT_2_OUTER_schema
   )
 
