@@ -93,6 +93,30 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     Nil
   }
 
+  it should "Perform a PIT join with three dataframes, no rows with tolerance" in {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.fg3
+    val fg3 = smallData.fg2
+
+    val left =
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(1)) && fg1("id") === fg2("id")
+      )
+
+    val pitJoin =
+      left.join(
+        fg3,
+        pit(fg1("ts"), fg3("ts"), lit(1)) && fg1("id") === fg3("id")
+      )
+
+    assert(!pitJoin.isEmpty)
+    // Assert same schema
+    assert(pitJoin.schema.equals(smallData.PIT_1_3_2_T1.schema))
+    // Assert same elements
+    assert(pitJoin.collect().sameElements(smallData.PIT_1_3_2_T1.collect()))
+  }
+  
   it should "Perform a PIT join with three dataframes, misaligned timestamps" in {
     val fg1 = smallData.fg1
     val fg2 = smallData.fg2
