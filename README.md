@@ -6,7 +6,7 @@ Apart from utilising existing high-level implementations, a couple of implementa
 
 The thesis that this project laid the foundation for can be found here: http://www.diva-portal.org/smash/get/diva2:1695672/FULLTEXT01.pdf.
 
-# This project is not being active developed on nor maintained. If you wish to build continue development on this project, feel free to make a fork!
+# This project is not being actively developed or maintained. If you wish to continue development on this project, feel free to make a fork!
 
 ## Table of contents
 
