@@ -93,7 +93,7 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     Nil
   }
 
-  it should "Perform a PIT join with three dataframes, no rows with tolerance" in {
+  it should "Perform a PIT join with three dataframes, no rows within tolerance" in {
     val fg1 = smallData.fg1
     val fg2 = smallData.fg3
     val fg3 = smallData.fg2
