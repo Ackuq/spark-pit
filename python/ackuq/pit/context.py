@@ -25,7 +25,7 @@
 from typing import Any, List, Optional, Tuple
 
 from py4j.java_gateway import JavaPackage
-from pyspark.sql import Column, DataFrame, SQLContext
+from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql.column import _to_java_column, _to_seq  # type: ignore
 from pyspark.sql.functions import lit
 
@@ -39,7 +39,7 @@ class PitContext(object):
     def _init_early_stop_sort_merge(self) -> None:
         # Call the init function in the Scala object,
         # will register the strategies and rules
-        self._essm.init(self._sql_context.sparkSession._jsparkSession)  # type: ignore
+        self._essm.init(self._spark._jsparkSession)  # type: ignore
 
     CLASSPATH_ERROR_MSG = (
         "Java class {} could not be imported, check that it is included in the JVM"
@@ -67,9 +67,9 @@ class PitContext(object):
                 self.CLASSPATH_ERROR_MSG.format("io.github.ackuq.pit.Exploding")
             )
 
-    def __init__(self, sql_context: SQLContext) -> None:
-        self._sql_context = sql_context
-        self._sc = self._sql_context._sc  # type: ignore
+    def __init__(self, spark: SparkSession) -> None:
+        self._spark = spark
+        self._sc = self._spark.sparkContext
         self._jsc = self._sc._jsc
         self._jvm = self._sc._jvm
 

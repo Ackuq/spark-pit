@@ -48,7 +48,7 @@ object EarlyStopSortMerge {
       spark.experimental.extraStrategies =
         spark.experimental.extraStrategies :+ CustomStrategy
     }
-    if (!spark.experimental.extraStrategies.contains(PITRule)) {
+    if (!spark.experimental.extraOptimizations.contains(PITRule)) {
       spark.experimental.extraOptimizations =
         spark.experimental.extraOptimizations :+ PITRule
     }

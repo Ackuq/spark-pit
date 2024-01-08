@@ -44,8 +44,7 @@ class SparkTests(unittest.TestCase):
             .config("spark.sql.shuffle.partitions", 1)
             .getOrCreate()
         )
-        self.sql_context = SQLContext(self.spark.sparkContext)
-        self.pit_context = PitContext(self.sql_context)
+        self.pit_context = PitContext(self.spark)
 
     def tearDown(self) -> None:
         self.spark.stop()
