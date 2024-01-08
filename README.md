@@ -4,6 +4,10 @@ This projects aims to expose different ways of executing PIT (Point-in-Time) joi
 
 Apart from utilising existing high-level implementations, a couple of implementations has been made to the Spark internals, specifically the join algorithms for executing a PIT-join.
 
+The thesis that this project laid the foundation for can be found here: http://www.diva-portal.org/smash/get/diva2:1695672/FULLTEXT01.pdf.
+
+# This project is not being active developed on nor maintained. If you wish to build continue development on this project, feel free to make a fork!
+
 ## Table of contents
 
 - [Prerequisites](#prerequisites)
