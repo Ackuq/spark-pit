@@ -2,8 +2,11 @@
 .idea
 *.iml
 .vscode
+.metals
+.bloop
 
 # Scala related files
+scala/project
 scala/target
 scala/project/target/
 scala/project/project/target/
