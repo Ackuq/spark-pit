@@ -202,14 +202,16 @@ protected[pit] case class PITJoinExec(
               new GenericInternalRow(right.output.length)
 
             override def advanceNext(): Boolean = {
-              while (smjScanner.findNextInnerJoinRows()) {
+              while (smjScanner.findNextLeftOuterJoinRows()) {
                 currentRightMatch = smjScanner.getBufferedMatch
                 currentLeftRow = smjScanner.getStreamedRow
-                if (returnNulls && currentRightMatch == null) {
-                  joinRow(currentLeftRow, nullRightRow)
-                  joinRow.withRight(nullRightRow)
-                  numOutputRows += 1
-                  return true
+                if (currentRightMatch == null) {
+                  if (returnNulls) {
+                    joinRow(currentLeftRow, nullRightRow)
+                    joinRow.withRight(nullRightRow)
+                    numOutputRows += 1
+                    return true
+                  }
                 } else {
                   joinRow(currentLeftRow, currentRightMatch)
                   if (boundCondition(joinRow)) {
@@ -493,6 +495,7 @@ protected[pit] case class PITJoinExec(
          |    do {
          |      if($rightRow == null) {
          |        if(!rightIter.hasNext()) {
+         |          $matched = null;
          |          return false;
          |        }
          |        $rightRow = (InternalRow) rightIter.next();
@@ -745,7 +748,7 @@ protected[pit] class PITJoinScanner(
     *   returns true, then [[getStreamedRow]] can be called to construct the
     *   joinresults.
     */
-  final def findNextInnerJoinRows(): Boolean = {
+  final def findNextLeftOuterJoinRows(): Boolean = {
     while (
       advancedStreamed() && streamedRowEquiKey.anyNull && streamedRowPITKey.anyNull
     ) {
@@ -777,7 +780,10 @@ protected[pit] class PITJoinScanner(
       matchJoinEquiKey = null
       matchJoinPITKey = null
       bufferedMatch = null
-      false
+      // If not returnNulls then we can exit early without searching through the remainder of the 
+      // streamed row. If returnNulls then it doesn't matter that there are no more candidate rows
+      // to match with - we still need to return the streamed row so they can be matched with nulls. 
+      returnNulls
     } else {
       // Advance both the streamed and buffered iterators to find the next pair of matching rows.
       var equiComp =

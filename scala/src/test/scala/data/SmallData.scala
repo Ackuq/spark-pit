@@ -25,50 +25,78 @@
 package io.github.ackuq.pit
 package data
 
-import org.apache.spark.sql.types.{
-  IntegerType,
-  StringType,
-  StructField,
-  StructType
-}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.StructType
 
 class SmallData(spark: SparkSession) {
-  private val DATA_RAW = Seq(
-    Seq(
-      Row(1, 4, "1z"),
-      Row(1, 5, "1x"),
-      Row(2, 6, "2x"),
-      Row(1, 7, "1y"),
-      Row(2, 8, "2y")
-    ),
-    Seq(
-      Row(1, 4, "1z"),
-      Row(1, 5, "1x"),
-      Row(2, 6, "2x"),
-      Row(1, 7, "1y"),
-      Row(2, 8, "2y")
-    ),
-    Seq(
-      Row(1, 1, "f3-1-1"),
-      Row(2, 2, "f3-2-2"),
-      Row(1, 6, "f3-1-6"),
-      Row(2, 8, "f3-2-8"),
-      Row(1, 10, "f3-1-10")
-    )
+  val RAW_1 = Seq(
+    Row(1, 4, "1z"),
+    Row(1, 5, "1x"),
+    Row(2, 6, "2x"),
+    Row(1, 7, "1y"),
+    Row(2, 8, "2y")
   )
-  private val schema: StructType = StructType(
+  val RAW_1_WITH_NULLS = Seq(
+    Row(1, 4, "1z"),
+    Row(1, 5, null),
+    Row(2, 6, "2x"),
+    Row(1, 7, "1y"),
+    Row(2, 8, "2y")
+  )
+  val RAW_3 = Seq(
+    Row(1, 1, "f3-1-1"),
+    Row(2, 2, "f3-2-2"),
+    Row(1, 6, "f3-1-6"),
+    Row(2, 8, "f3-2-8"),
+    Row(1, 10, "f3-1-10")
+  )
+  val RAW_3_WITH_NULLS = Seq(
+    Row(1, 1, "f3-1-1"),
+    Row(2, 2, "f3-2-2"),
+    Row(1, 6, "f3-1-6"),
+    Row(2, 8, null),
+    Row(1, 10, "f3-1-10")
+  )
+  val schema: StructType = StructType(
     Seq(
       StructField("id", IntegerType, nullable = false),
       StructField("ts", IntegerType, nullable = false),
       StructField("value", StringType, nullable = false)
     )
   )
+  val schema_nullable: StructType = StructType(
+    Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("ts", IntegerType, nullable = false),
+      StructField("value", StringType, nullable = true)
+    )
+  )
 
   val fg1: DataFrame =
-    spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW.head), schema)
+    spark.createDataFrame(spark.sparkContext.parallelize(RAW_1), schema)
+  val fg1_with_nulls: DataFrame =
+    spark.createDataFrame(
+      spark.sparkContext.parallelize(RAW_1_WITH_NULLS),
+      schema_nullable
+    )
   val fg2: DataFrame =
-    spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(1)), schema)
+    spark.createDataFrame(spark.sparkContext.parallelize(RAW_1), schema)
   val fg3: DataFrame =
-    spark.createDataFrame(spark.sparkContext.parallelize(DATA_RAW(2)), schema)
+    spark.createDataFrame(spark.sparkContext.parallelize(RAW_3), schema)
+  val fg3_with_nulls: DataFrame =
+    spark.createDataFrame(
+      spark.sparkContext.parallelize(RAW_3_WITH_NULLS),
+      schema_nullable
+    )
+
+  val empty: DataFrame =
+    spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+
+  val empty2: DataFrame =
+    spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
 }

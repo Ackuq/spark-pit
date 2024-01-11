@@ -34,4 +34,6 @@ trait SparkSessionTestWrapper {
     .config("spark.ui.showConsoleProgress", value = false)
     .config("spark.sql.shuffle.partitions", 1)
     .getOrCreate()
+
+  spark.sparkContext.setLogLevel("ERROR")
 }
