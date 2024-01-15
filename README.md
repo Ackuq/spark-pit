@@ -62,11 +62,10 @@ pip install spark-pit
 The object `PitContext` is the entrypoint for all of the functionality of the lirary. You can initialize this context with the following code:
 
 ```py
-from pyspark import SQLContext
 from ackuq.pit import PitContext
 
-sql_context = SQLContext(spark.sparkContext)
-pit_context = PitContext(sql_context)
+spark = <your spark session>
+pit_context = PitContext(spark)
 ```
 
 ### 2. Performing a PIT join
