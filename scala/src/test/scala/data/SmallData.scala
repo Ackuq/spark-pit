@@ -41,12 +41,31 @@ class SmallData(spark: SparkSession) {
     Row(1, 7, "1y"),
     Row(2, 8, "2y")
   )
-  val RAW_1_WITH_NULLS = Seq(
+  val RAW_1_DUPLICTES = Seq(
+    Row(1, 4, "1z"),
+    Row(1, 4, "1z"),
+    Row(1, 5, "1x"),
+    Row(1, 5, "1x"),
+    Row(2, 6, "2x"),
+    Row(2, 6, "2x"),
+    Row(1, 7, "1y"),
+    Row(1, 7, "1y"),
+    Row(2, 8, "2y"),
+    Row(2, 8, "2y")
+  )
+  val RAW_1_WITH_VALUE_NULLS = Seq(
     Row(1, 4, "1z"),
     Row(1, 5, null),
     Row(2, 6, "2x"),
     Row(1, 7, "1y"),
     Row(2, 8, "2y")
+  )
+  val RAW_1_WITH_KEY_NULLS = Seq(
+    Row(1, 4, "1z"),
+    Row(1, null, "1x"),
+    Row(2, 6, "2x"),
+    Row(1, 7, "1y"),
+    Row(null, 8, "2y")
   )
   val RAW_3 = Seq(
     Row(1, 1, "f3-1-1"),
@@ -55,11 +74,30 @@ class SmallData(spark: SparkSession) {
     Row(2, 8, "f3-2-8"),
     Row(1, 10, "f3-1-10")
   )
-  val RAW_3_WITH_NULLS = Seq(
+  val RAW_3_DUPLICATES = Seq(
+    Row(1, 1, "f3-1-1"),
+    Row(1, 1, "f3-1-1"),
+    Row(2, 2, "f3-2-2"),
+    Row(2, 2, "f3-2-2"),
+    Row(1, 6, "f3-1-6"),
+    Row(1, 6, "f3-1-6"),
+    Row(2, 8, "f3-2-8"),
+    Row(2, 8, "f3-2-8"),
+    Row(1, 10, "f3-1-10"),
+    Row(1, 10, "f3-1-10")
+  )
+  val RAW_3_WITH_VALUE_NULLS = Seq(
     Row(1, 1, "f3-1-1"),
     Row(2, 2, "f3-2-2"),
     Row(1, 6, "f3-1-6"),
     Row(2, 8, null),
+    Row(1, 10, "f3-1-10")
+  )
+  val RAW_3_WITH_KEY_NULLS = Seq(
+    Row(1, 1, "f3-1-1"),
+    Row(2, null, "f3-2-2"),
+    Row(null, 6, "f3-1-6"),
+    Row(2, 8, "f3-2-8"),
     Row(1, 10, "f3-1-10")
   )
   val schema: StructType = StructType(
@@ -69,7 +107,7 @@ class SmallData(spark: SparkSession) {
       StructField("value", StringType, nullable = false)
     )
   )
-  val schema_nullable: StructType = StructType(
+  val schema_value_nullable: StructType = StructType(
     Seq(
       StructField("id", IntegerType, nullable = false),
       StructField("ts", IntegerType, nullable = false),
@@ -77,21 +115,43 @@ class SmallData(spark: SparkSession) {
     )
   )
 
+  val schema_keys_nullable: StructType = StructType(
+    Seq(
+      StructField("id", IntegerType, nullable = true),
+      StructField("ts", IntegerType, nullable = true),
+      StructField("value", StringType, nullable = false)
+    )
+  )
+
   val fg1: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(RAW_1), schema)
-  val fg1_with_nulls: DataFrame =
+  val fg1_duplicates: DataFrame =
+    spark.createDataFrame(spark.sparkContext.parallelize(RAW_1_DUPLICTES), schema)
+  val fg1_with_value_nulls: DataFrame =
     spark.createDataFrame(
-      spark.sparkContext.parallelize(RAW_1_WITH_NULLS),
-      schema_nullable
+      spark.sparkContext.parallelize(RAW_1_WITH_VALUE_NULLS),
+      schema_value_nullable
+    )
+  val fg1_with_key_nulls: DataFrame =
+    spark.createDataFrame(
+      spark.sparkContext.parallelize(RAW_1_WITH_KEY_NULLS),
+      schema_keys_nullable
     )
   val fg2: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(RAW_1), schema)
   val fg3: DataFrame =
     spark.createDataFrame(spark.sparkContext.parallelize(RAW_3), schema)
-  val fg3_with_nulls: DataFrame =
+  val fg3_duplicates: DataFrame =
+    spark.createDataFrame(spark.sparkContext.parallelize(RAW_3_DUPLICATES), schema)
+  val fg3_with_value_nulls: DataFrame =
     spark.createDataFrame(
-      spark.sparkContext.parallelize(RAW_3_WITH_NULLS),
-      schema_nullable
+      spark.sparkContext.parallelize(RAW_3_WITH_VALUE_NULLS),
+      schema_value_nullable
+    )
+  val fg3_with_key_nulls: DataFrame =
+    spark.createDataFrame(
+      spark.sparkContext.parallelize(RAW_3_WITH_KEY_NULLS),
+      schema_keys_nullable
     )
 
   val empty: DataFrame =
