@@ -352,7 +352,7 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
       smallData.fg1_with_key_nulls,
       smallData.fg3_with_key_nulls,
       smallData.PIT_1_3_WITH_KEY_NULLS,
-      // It could be argued the correct schema would be `smallData.PIT_2_schema`, 
+      // It could be argued the correct schema would be `smallData.PIT_2_schema`,
       // i.e. with join key columns made non-nullable. However, the normal spark inner
       // join does not do this, so we don't either.
       smallData.PIT_2_NULLABLE_KEYS_schema,
@@ -430,5 +430,20 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
   }
   testBothCodegenAndInterpreted("left_join_three_dataframes") {
     testJoiningThreeDataframes("left", smallData.PIT_3_OUTER_schema)
+  }
+
+  testBothCodegenAndInterpreted("fail_during_planning_for_non_equi_condition") {
+    val fg1 = smallData.fg1
+    val fg2 = smallData.fg2
+
+    val pitJoin =
+      fg1.join(
+        fg2,
+        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id") && fg1("value") > fg2("value"),
+        "inner"
+      )
+    intercept[IllegalArgumentException] {
+      pitJoin.explain()
+    }
   }
 }

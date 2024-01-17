@@ -108,13 +108,10 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
     // These need to be sortable in order to make the algorithm work optimized
     val equiJoinKeys = getEquiJoinKeys(predicates, join.left, join.right)
 
-    val otherPredicates = predicates.filterNot {
-      case EqualTo(l, r) if l.references.isEmpty || r.references.isEmpty =>
-        false
-      case Equality(l, r) =>
-        canEvaluate(l, join.left) && canEvaluate(r, join.right) ||
-        canEvaluate(l, join.right) && canEvaluate(r, join.left)
-      case _ => false
+    if (predicates.length != equiJoinKeys.length) {
+      throw new IllegalArgumentException(
+        "Besides the PIT key, only equi-conditions are supported for PIT joins"
+      )
     }
     val leftPitKey =
       if (canEvaluate(join.pitCondition.children.head, join.left))
@@ -135,7 +132,7 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
         rightPitKey,
         leftEquiKeys,
         rightEquiKeys,
-        otherPredicates.reduceOption(And),
+        None,
         join.returnNulls,
         join.tolerance,
         join.left,

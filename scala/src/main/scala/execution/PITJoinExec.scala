@@ -553,32 +553,6 @@ protected[pit] case class PITJoinExec(
     (leftRow, matched)
   }
 
-  /** Splits variables based on whether it's used by condition or not, returns
-    * the code to create these variables before the condition and after the
-    * condition.
-    *
-    * Only a few columns are used by condition, then we can skip the accessing
-    * of those columns that are not used by condition also filtered out by
-    * condition.
-    */
-  private def splitVarsByCondition(
-      attributes: Seq[Attribute],
-      variables: Seq[ExprCode]
-  ): (String, String) = {
-    if (condition.isDefined) {
-      val condRefs = condition.get.references
-      val (used, notUsed) =
-        attributes.zip(variables).partition { case (a, ev) =>
-          condRefs.contains(a)
-        }
-      val beforeCond = evaluateVariables(used.map(_._2))
-      val afterCond = evaluateVariables(notUsed.map(_._2))
-      (beforeCond, afterCond)
-    } else {
-      (evaluateVariables(variables), "")
-    }
-  }
-
   override def needCopyResult: Boolean = true
 
   override protected def doProduce(ctx: CodegenContext): String = {
@@ -605,38 +579,7 @@ protected[pit] case class PITJoinExec(
 
     val numOutput = metricTerm(ctx, "numOutputRows")
 
-    val (beforeLoop, condCheck) = if (condition.isDefined) {
-      // Split the code of creating variables based on whether it's used by condition or not.
-      val loaded = ctx.freshName("loaded")
-      val (leftBefore, leftAfter) = splitVarsByCondition(left.output, leftVars)
-      val (rightBefore, rightAfter) =
-        splitVarsByCondition(right.output, rightVars)
-      // Generate code for condition
-      ctx.currentVars = leftVars ++ rightVars
-      val cond =
-        BindReferences.bindReference(condition.get, output).genCode(ctx)
-      // evaluate the columns those used by condition before loop
-      val before =
-        s"""
-           |boolean $loaded = false;
-           |$leftBefore
-         """.stripMargin
-
-      val checking =
-        s"""
-           |$rightBefore
-           |${cond.code}
-           |if (${cond.isNull}|| !${cond.value}) continue;
-           |if (!$loaded) {
-           |  $loaded = true;
-           |  $leftAfter
-           |}
-           |$rightAfter
-     """.stripMargin
-      (before, checking)
-    } else {
-      (evaluateVariables(leftVars), "")
-    }
+    val beforeLoop = evaluateVariables(leftVars)
 
     val thisPlan = ctx.addReferenceObj("plan", this)
     val eagerCleanup = s"$thisPlan.cleanupResources();"
@@ -647,7 +590,6 @@ protected[pit] case class PITJoinExec(
          |  ${leftVarDecl.mkString("\n")}
          |  ${beforeLoop.trim}
          |  InternalRow $rightRow = (InternalRow) $matched;
-         |  ${condCheck.trim}
          |  $numOutput.add(1);
          |  ${consume(ctx, leftVars ++ rightVars)};
          |  if (shouldStop()) return;
@@ -659,7 +601,6 @@ protected[pit] case class PITJoinExec(
          |  ${leftVarDecl.mkString("\n")}
          |  ${beforeLoop.trim}
          |  InternalRow $rightRow = (InternalRow) $matched;
-         |  ${condCheck.trim}
          |  $numOutput.add(1);
          |  ${consume(ctx, leftVars ++ rightVars)}
          |  if (shouldStop()) return;
