@@ -22,10 +22,11 @@
 # SOFTWARE.
 #
 
-from pyspark.sql import Column, DataFrame
+from pyspark.sql import Column, DataFrame, SparkSession
 
 
 def joinPIT(
+    spark: SparkSession,
     left: DataFrame,
     right: DataFrame,
     leftPitKey: Column,
@@ -34,7 +35,7 @@ def joinPIT(
     how: str = "inner",
     tolerance: int = 0,
 ) -> DataFrame:
-    jdf = left.sparkSession.sparkContext._jvm.io.github.ackuq.pit.EarlyStopSortMerge.joinPIT(
+    jdf = spark.sparkContext._jvm.io.github.ackuq.pit.EarlyStopSortMerge.joinPIT(
         left._jdf,
         right._jdf,
         leftPitKey._jc,
@@ -43,4 +44,4 @@ def joinPIT(
         how,
         tolerance,
     )
-    return DataFrame(jdf, left.sparkSession)
+    return DataFrame(jdf, spark)
