@@ -30,11 +30,11 @@ import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StructType
 import org.scalatest.flatspec.AnyFlatSpec
 
-import EarlyStopSortMerge.pit
+import EarlyStopSortMerge.joinPIT
 import data.SmallDataSortMerge
+import io.github.ackuq.pit.execution.CustomStrategy
 
 class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
-  EarlyStopSortMerge.init(spark)
   val smallData = new SmallDataSortMerge(spark)
 
   def testBothCodegenAndInterpreted(name: String)(f: => Unit): Unit = {
@@ -63,16 +63,15 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     leftDataFrame.show()
     rightDataFrame.show()
 
-    val pitJoin =
-      leftDataFrame.join(
-        rightDataFrame,
-        pit(
-          leftDataFrame("ts"),
-          rightDataFrame("ts"),
-          lit(tolerance)
-        ) && leftDataFrame("id") === rightDataFrame("id"),
-        joinType
-      )
+    val pitJoin = joinPIT(
+      leftDataFrame,
+      rightDataFrame,
+      leftDataFrame("ts"),
+      rightDataFrame("ts"),
+      leftDataFrame("id") === rightDataFrame("id"),
+      joinType,
+      tolerance,
+    )
 
     pitJoin.explain("codegen")
     pitJoin.printSchema()
@@ -399,6 +398,30 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     )
   }
 
+  def testJoinThenFilter() {
+    val leftDataFrame = smallData.fg3
+    val rightDataFrame = smallData.fg1
+
+    var pitJoin = joinPIT(
+      leftDataFrame,
+      rightDataFrame,
+      leftDataFrame("ts"),
+      rightDataFrame("ts"),
+      leftDataFrame("id") === rightDataFrame("id"),
+      "inner",
+      0,
+    ).filter(rightDataFrame("value") === lit("1x"))
+
+    assert(pitJoin.schema.equals(smallData.PIT_2_schema))
+    assert(pitJoin.collect().sameElements(smallData.PIT_3_1_FILTERED.collect()))
+  }
+
+  testBothCodegenAndInterpreted(
+    "inner_join_then_filter"
+  ) {
+    testJoinThenFilter()
+  }
+
   def testJoiningThreeDataframes(
       joinType: String,
       expectedSchema: StructType
@@ -407,19 +430,25 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     val fg2 = smallData.fg2
     val fg3 = smallData.fg3
 
-    val left =
-      fg1.join(
-        fg2,
-        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id"),
-        joinType
-      )
+    val left = joinPIT(
+      fg1,
+      fg2,
+      fg1("ts"),
+      fg2("ts"),
+      fg1("id") === fg2("id"),
+      joinType,
+      0,
+    )
 
-    val pitJoin =
-      left.join(
-        fg3,
-        pit(fg1("ts"), fg3("ts"), lit(0)) && fg1("id") === fg3("id"),
-        joinType
-      )
+    val pitJoin = joinPIT(
+      left,
+      fg3,
+      fg1("ts"),
+      fg3("ts"),
+      fg1("id") === fg3("id"),
+      joinType,
+      0,
+    )
 
     assert(pitJoin.schema.equals(expectedSchema))
     assert(pitJoin.collect().sameElements(smallData.PIT_1_2_3.collect()))
@@ -436,12 +465,15 @@ class EarlyStopMergeTests extends AnyFlatSpec with SparkSessionTestWrapper {
     val fg1 = smallData.fg1
     val fg2 = smallData.fg2
 
-    val pitJoin =
-      fg1.join(
-        fg2,
-        pit(fg1("ts"), fg2("ts"), lit(0)) && fg1("id") === fg2("id") && fg1("value") > fg2("value"),
-        "inner"
-      )
+    val pitJoin = joinPIT(
+      fg1,
+      fg2,
+      fg1("ts"),
+      fg2("ts"),
+      (fg1("id") === fg2("id") && fg1("value") > fg2("value")),
+      "inner",
+      0,
+    )
     intercept[IllegalArgumentException] {
       pitJoin.explain()
     }

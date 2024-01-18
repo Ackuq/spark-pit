@@ -25,29 +25,30 @@
 import os
 import unittest
 
-from pyspark import SQLContext
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructField, StructType
 
-from ackuq.pit.context import PitContext
-
 
 class SparkTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.jar_location = os.environ["SCALA_PIT_JAR"]
-        print("Loading jar from location: {}".format(self.jar_location))
-        self.spark = (
+    spark: SparkSession
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        jar_location = os.environ["SCALA_PIT_JAR"]
+        print("Loading jar from location: {}".format(jar_location))
+        cls.spark = (
             SparkSession.builder.appName("sparkTests")
             .master("local")
             .config("spark.ui.showConsoleProgress", False)
-            .config("spark.driver.extraClassPath", self.jar_location)
+            .config("spark.driver.extraClassPath", jar_location)
             .config("spark.sql.shuffle.partitions", 1)
+            .config("spark.sql.extensions", "io.github.ackuq.pit.SparkPIT")
             .getOrCreate()
         )
-        self.pit_context = PitContext(self.spark)
 
-    def tearDown(self) -> None:
-        self.spark.stop()
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.spark.stop()
 
     def _assertFieldsEqual(self, a: StructField, b: StructField):
         self.assertEqual(a.name.lower(), b.name.lower())

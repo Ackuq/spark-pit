@@ -99,7 +99,7 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
   )
 
   def unapply(join: PITJoin): Option[ReturnType] = {
-    logDebug(s"Considering join on: ${join.condition}")
+    logDebug(s"Considering PIT join")
 
     val predicates =
       join.condition.map(splitConjunctivePredicates).getOrElse(Nil)
@@ -113,23 +113,14 @@ object PITJoinExtractEquality extends ExtractEqualityKeys {
         "Besides the PIT key, only equi-conditions are supported for PIT joins"
       )
     }
-    val leftPitKey =
-      if (canEvaluate(join.pitCondition.children.head, join.left))
-        join.pitCondition.children.head
-      else join.pitCondition.children(1)
-
-    val rightPitKey =
-      if (canEvaluate(join.pitCondition.children.head, join.right))
-        join.pitCondition.children.head
-      else join.pitCondition.children(1)
 
     val (leftEquiKeys, rightEquiKeys) = equiJoinKeys.unzip
 
-    logDebug(s"leftPitKey:$leftPitKey | rightPitKey:$rightPitKey")
+    logDebug(s"leftPitKey:${join.leftPitKey} | rightPitKey:${join.rightPitKey}")
     Some(
       (
-        leftPitKey,
-        rightPitKey,
+        join.leftPitKey,
+        join.rightPitKey,
         leftEquiKeys,
         rightEquiKeys,
         None,

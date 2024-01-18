@@ -22,23 +22,22 @@
 # SOFTWARE.
 #
 
+from ackuq.pit.joinPIT import joinPIT
 from tests.data import SmallDataSortMerge
 from tests.utils import SparkTests
 
 
 class SortMergeUnionAsOfTest(SparkTests):
-    def setUp(self) -> None:
-        super().setUp()
-        self.small_data = SmallDataSortMerge(self.spark)
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.small_data = SmallDataSortMerge(cls.spark)
 
     def test_two_aligned(self):
         fg1 = self.small_data.fg1
         fg2 = self.small_data.fg2
 
-        pit_join = fg1.join(
-            fg2,
-            self.pit_context.pit_udf(fg1["ts"], fg2["ts"]) & (fg1["id"] == fg2["id"]),
-        )
+        pit_join = joinPIT(fg1, fg2, fg1["ts"], fg2["ts"], (fg1["id"] == fg2["id"]))
 
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_2.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_2.collect())
@@ -47,10 +46,7 @@ class SortMergeUnionAsOfTest(SparkTests):
         fg1 = self.small_data.fg1
         fg2 = self.small_data.fg3
 
-        pit_join = fg1.join(
-            fg2,
-            self.pit_context.pit_udf(fg1["ts"], fg2["ts"]) & (fg1["id"] == fg2["id"]),
-        )
+        pit_join = joinPIT(fg1, fg2, fg1["ts"], fg2["ts"], (fg1["id"] == fg2["id"]))
 
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3.collect())
@@ -60,15 +56,15 @@ class SortMergeUnionAsOfTest(SparkTests):
         fg2 = self.small_data.fg2
         fg3 = self.small_data.fg3
 
-        left = fg1.join(
+        left = joinPIT(
+            fg1,
             fg2,
-            self.pit_context.pit_udf(fg1["ts"], fg2["ts"]) & (fg1["id"] == fg2["id"]),
+            fg1["ts"],
+            fg2["ts"],
+            (fg1["id"] == fg2["id"]),
         )
 
-        pit_join = left.join(
-            fg3,
-            self.pit_context.pit_udf(fg1["ts"], fg3["ts"]) & (fg1["id"] == fg3["id"]),
-        )
+        pit_join = joinPIT(left, fg3, fg1["ts"], fg3["ts"], (fg1["id"] == fg3["id"]))
 
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_2_3.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_2_3.collect())
@@ -77,10 +73,8 @@ class SortMergeUnionAsOfTest(SparkTests):
         fg1 = self.small_data.fg1
         fg2 = self.small_data.fg3
 
-        pit_join = fg1.join(
-            fg2,
-            self.pit_context.pit_udf(fg1["ts"], fg2["ts"], 1)
-            & (fg1["id"] == fg2["id"]),
+        pit_join = joinPIT(
+            fg1, fg2, fg1["ts"], fg2["ts"], (fg1["id"] == fg2["id"]), tolerance=1
         )
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3_T1.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3_T1.collect())
@@ -89,11 +83,8 @@ class SortMergeUnionAsOfTest(SparkTests):
         fg1 = self.small_data.fg1
         fg2 = self.small_data.fg3
 
-        pit_join = fg1.join(
-            fg2,
-            self.pit_context.pit_udf(fg1["ts"], fg2["ts"], 1)
-            & (fg1["id"] == fg2["id"]),
-            "left",
+        pit_join = joinPIT(
+            fg1, fg2, fg1["ts"], fg2["ts"], (fg1["id"] == fg2["id"]), "left", 1
         )
         self.assertSchemaEqual(pit_join.schema, self.small_data.PIT_1_3_T1_OUTER.schema)
         self.assertEqual(pit_join.collect(), self.small_data.PIT_1_3_T1_OUTER.collect())

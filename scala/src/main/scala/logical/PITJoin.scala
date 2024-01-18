@@ -45,7 +45,8 @@ protected[pit] case object PITJoinType extends CustomJoinType {
 protected[pit] case class PITJoin(
     left: LogicalPlan,
     right: LogicalPlan,
-    pitCondition: Expression,
+    leftPitKey: Expression,
+    rightPitKey: Expression,
     returnNulls: Boolean,
     tolerance: Long,
     condition: Option[Expression]

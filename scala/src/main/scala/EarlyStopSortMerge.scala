@@ -24,36 +24,92 @@
 
 package io.github.ackuq.pit
 
-import execution.CustomStrategy
-import logical.PITRule
+import org.apache.spark.sql.{
+  Column,
+  DataFrame,
+  SparkSessionExtensionsProvider,
+  SparkSessionExtensions
+}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.plans.{Inner, LeftOuter, JoinType}
 
-import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.{Column, SparkSession}
+import execution.CustomStrategy
+import logical.PITJoin
 
 object EarlyStopSortMerge {
-  private final val PIT_FUNCTION = (
-      _: Column,
-      _: Column,
-      _: Long
-  ) => true
-  final val PIT_UDF_NAME = "PIT"
-  final val pit: UserDefinedFunction = udf(PIT_FUNCTION).withName(PIT_UDF_NAME)
+  def joinPIT(
+      left: DataFrame,
+      right: DataFrame,
+      leftPitExpression: Column,
+      rightPitExpression: Column,
+      joinType: String,
+      tolerance: Long
+  ): DataFrame = joinPIT(
+    left,
+    right,
+    leftPitExpression,
+    rightPitExpression,
+    None,
+    joinType,
+    tolerance
+  )
 
-  def init(spark: SparkSession): Unit = {
-    if (!spark.catalog.functionExists(PIT_UDF_NAME)) {
-      spark.udf.register(PIT_UDF_NAME, pit)
+  def joinPIT(
+      left: DataFrame,
+      right: DataFrame,
+      leftPitExpression: Column,
+      rightPitExpression: Column,
+      joinExprs: Column,
+      joinType: String,
+      tolerance: Long
+  ): DataFrame = joinPIT(
+    left,
+    right,
+    leftPitExpression,
+    rightPitExpression,
+    Some(joinExprs),
+    joinType,
+    tolerance
+  )
+
+  def joinPIT(
+      left: DataFrame,
+      right: DataFrame,
+      leftPitExpression: Column,
+      rightPitExpression: Column,
+      joinExprs: Option[Column],
+      joinType: String,
+      tolerance: Long
+  ): DataFrame = {
+
+    val parsedJoinType = JoinType(joinType)
+    parsedJoinType match {
+      case LeftOuter | Inner => ()
+      case x =>
+        throw new IllegalArgumentException(
+          s"Join type $x not supported for PIT joins"
+        )
     }
-    if (!spark.experimental.extraStrategies.contains(CustomStrategy)) {
-      spark.experimental.extraStrategies =
-        spark.experimental.extraStrategies :+ CustomStrategy
-    }
-    if (!spark.experimental.extraOptimizations.contains(PITRule)) {
-      spark.experimental.extraOptimizations =
-        spark.experimental.extraOptimizations :+ PITRule
-    }
+
+    val logicalPlan = PITJoin(
+      left.queryExecution.analyzed,
+      right.queryExecution.analyzed,
+      leftPitExpression.expr,
+      rightPitExpression.expr,
+      parsedJoinType == LeftOuter,
+      tolerance,
+      joinExprs.map(_.expr)
+    )
+    new DataFrame(
+      left.sparkSession,
+      logicalPlan,
+      ExpressionEncoder(logicalPlan.schema)
+    )
   }
+}
 
-  // For the PySpark API
-  def getPit: UserDefinedFunction = pit
+class SparkPIT extends SparkSessionExtensionsProvider {
+  override def apply(extensions: SparkSessionExtensions): Unit = {
+    extensions.injectPlannerStrategy(session => CustomStrategy)
+  }
 }
